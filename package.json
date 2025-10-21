@@ -1,0 +1,17 @@
+{
+  "name": "hh-agentic",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "install-all": "npm --prefix frontend install && npm --prefix backend install",
+    "dev": "concurrently \"npm --prefix backend run start:dev\" \"npm --prefix frontend run dev\"",
+    "start-backend": "npm --prefix backend start",
+    "start-frontend": "npm --prefix frontend start"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^8.2.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14"
+  }
+}
