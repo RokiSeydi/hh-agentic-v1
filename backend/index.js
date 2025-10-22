@@ -263,11 +263,15 @@ app.post("/api/clear-conversation", (req, res) => {
   res.json({ success: true });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`✅ Backend running on http://localhost:${PORT}`);
-  console.log(
-    `✅ API Key configured: ${process.env.ANTHROPIC_API_KEY ? "Yes" : "No"}`
-  );
-  console.log(`✅ Providers loaded: ${Object.keys(PROVIDER_REGISTRY).length}`);
-});
+// Start server (only for local development)
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`✅ Backend running on http://localhost:${PORT}`);
+    console.log(
+      `✅ API Key configured: ${process.env.ANTHROPIC_API_KEY ? "Yes" : "No"}`
+    );
+    console.log(
+      `✅ Providers loaded: ${Object.keys(PROVIDER_REGISTRY).length}`
+    );
+  });
+}
