@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, ChevronLeft, Heart, X, Check, Loader2 } from "lucide-react";
 
 // For testing in Claude.ai, we'll use mock mode
-const API_URL = "http://localhost:3001";
+// const API_URL = "http://localhost:3001";
+const API_URL = "";
 const MOCK_MODE = false; // Set to false when backend is running
 
 // Mock providers for testing
