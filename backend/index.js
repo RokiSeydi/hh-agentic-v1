@@ -15,6 +15,9 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Detect serverless environment (Vercel sets VERCEL=1)
+const isServerless = Boolean(process.env.VERCEL);
+
 // Provider Registry
 const PROVIDER_REGISTRY = {
   "dr-emma-therapist": {
@@ -124,6 +127,79 @@ app.post("/api/stream-chat", async (req, res) => {
 
   conversation.push({ role: "user", content: message });
   profile.exchangeCount += 1;
+
+  // Set SSE headers
+  // If we're in a serverless environment (Vercel) we cannot reliably use long-lived SSE streams.
+  if (isServerless) {
+    try {
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        system: PEA_SYSTEM_PROMPT,
+        messages: conversation.filter((m) => m.content && m.content.trim()),
+        max_tokens: 1024,
+      });
+
+      const assistantText = Array.isArray(response?.content)
+        ? response.content.map((c) => c.text || "").join("")
+        : response?.content?.text || "";
+
+      // Save complete response to conversation history
+      conversation.push({ role: "assistant", content: assistantText });
+      conversations.set(conversationId, conversation);
+
+      // (Optional) run provider recommendation logic here synchronously
+      let shouldShowProviders = false;
+      let recommendedProviders = profile.recommendedProviders || [];
+
+      if (profile.exchangeCount >= 6 && !profile.recommendedProviders) {
+        try {
+          const recommendationResponse = await anthropic.messages.create({
+            model: "claude-sonnet-4-5-20250929",
+            max_tokens: 200,
+            system: `You are an expert at matching students with healthcare providers. Respond ONLY with provider IDs, comma-separated.`,
+            messages: [
+              {
+                role: "user",
+                content: `Based on this conversation, recommend 2-3 providers:\n\n${conversation
+                  .map((msg) => `${msg.role}: ${msg.content}`)
+                  .join("\n")}
+\nProvider IDs only, comma-separated:`,
+              },
+            ],
+          });
+
+          const recommendedIds = recommendationResponse.content[0].text
+            .trim()
+            .toLowerCase()
+            .split(",")
+            .map((id) => id.trim());
+
+          recommendedProviders = recommendedIds
+            .map((id) => PROVIDER_REGISTRY[id])
+            .filter(Boolean);
+          if (recommendedProviders.length) {
+            profile.recommendedProviders = recommendedProviders;
+            userProfiles.set(conversationId, profile);
+            shouldShowProviders = true;
+          }
+        } catch (err) {
+          console.error(
+            "Recommendation (serverless) failed:",
+            err?.message || err
+          );
+        }
+      }
+
+      return res.json({
+        message: assistantText,
+        shouldShowProviders,
+        recommendedProviders,
+      });
+    } catch (err) {
+      console.error("Serverless chat error:", err);
+      return res.status(500).json({ error: err.message || "Unknown error" });
+    }
+  }
 
   // Set SSE headers
   res.setHeader("Content-Type", "text/event-stream");
@@ -276,5 +352,7 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// Export for Vercel serverless
-export default app;
+// EXPORT FOR VERCEL: one request at a time
+export default function handler(req, res) {
+  return app(req, res);
+}

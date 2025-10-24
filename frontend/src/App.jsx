@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, ChevronLeft, Heart, X, Check, Loader2 } from "lucide-react";
 
 // For testing in Claude.ai, we'll use mock mode
-// const API_URL = "http://localhost:3001";
-const API_URL = "";
+// Use Vite env var in production or fall back to relative paths when hosted on same domain
+const API_URL = import.meta.env?.VITE_API_URL || ""; // set VITE_API_URL in Vercel to your backend URL if separate
 const MOCK_MODE = false; // Set to false when backend is running
 
 // Mock providers for testing

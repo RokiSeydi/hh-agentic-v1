@@ -1,0 +1,62 @@
+[
+  {
+    "id": "dr-emma-therapist",
+    "name": "Dr. Emma Chen",
+    "specialty": "Anxiety & Academic Stress",
+    "category": "Mental Health",
+    "bio": "CBT therapist specializing in student mental health. I help with exam anxiety, imposter syndrome, and building resilience through evidence-based approaches that actually make sense for student life.",
+    "credentials": "CBT-certified | 8+ years with students",
+    "color": "bg-blue-100",
+    "accentColor": "bg-blue-600"
+  },
+  {
+    "id": "tom-osteopath",
+    "name": "Tom Richardson",
+    "specialty": "Back Pain & Posture",
+    "category": "Musculoskeletal",
+    "bio": "Osteopath helping students with back pain, poor posture from desk work, and sports injuries. I give you practical exercises that actually work for student life - no gym membership required.",
+    "credentials": "10 years experience | GOsC registered",
+    "color": "bg-green-100",
+    "accentColor": "bg-green-600"
+  },
+  {
+    "id": "maya-yoga",
+    "name": "Maya Patel",
+    "specialty": "Gentle Movement & Chronic Conditions",
+    "category": "Movement & Wellness",
+    "bio": "Trauma-informed yoga instructor who works with people managing chronic conditions and fatigue. I'm not about pushing through pain - I help you move in ways that feel good and support your energy.",
+    "credentials": "200hr certified | Trauma-informed training",
+    "color": "bg-orange-100",
+    "accentColor": "bg-orange-600"
+  },
+  {
+    "id": "lisa-nutritionist",
+    "name": "Lisa Ahmed",
+    "specialty": "Student Nutrition & Budget-Friendly Eating",
+    "category": "Nutrition & Wellness",
+    "bio": "Registered nutritionist who gets that students are broke and busy. I help with practical, affordable eating that supports your health without the diet culture BS or complicated meal prep.",
+    "credentials": "RNutr registered | Anti-diet approach",
+    "color": "bg-yellow-100",
+    "accentColor": "bg-yellow-600"
+  },
+  {
+    "id": "sarah-acupuncture",
+    "name": "Sarah Liu",
+    "specialty": "Pain Management & Stress Relief",
+    "category": "Alternative Therapies",
+    "bio": "Licensed acupuncturist combining traditional Chinese medicine with modern understanding. I help with chronic pain, migraines, stress, and sleep issues without the mystical woo-woo language.",
+    "credentials": "BAcC registered | 12 years practice",
+    "color": "bg-teal-100",
+    "accentColor": "bg-teal-600"
+  },
+  {
+    "id": "james-founder-coach",
+    "name": "James Okonkwo",
+    "specialty": "Founder Wellbeing & Strategy",
+    "category": "Life Coaching",
+    "bio": "Former founder who burned out, recovered, and now helps student entrepreneurs balance building companies without destroying their mental health. Been there, done that, learned the hard way.",
+    "credentials": "Built 2 companies | Certified coach",
+    "color": "bg-indigo-100",
+    "accentColor": "bg-indigo-600"
+  }
+]
