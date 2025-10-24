@@ -155,81 +155,121 @@ function App() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Add empty message that we'll update
-      setMessages((prev) => [...prev, { sender: "pea", text: "" }]);
+      // Check if we're in serverless mode (prod) where backend returns JSON
+      const contentType = response.headers.get("content-type") || "";
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-      let isDone = false;
-      let metadata = null;
+      if (contentType.includes("application/json")) {
+        // ----- NON-STREAMING MODE (Vercel serverless) -----
+        const data = await response.json();
 
-      while (!isDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        // data looks like:
+        // {
+        //   message: "... full assistant reply ...",
+        //   shouldShowProviders: false,
+        //   recommendedProviders: []
+        // }
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        // Add Pea's reply
+        setMessages((prev) => [...prev, { sender: "pea", text: data.message }]);
 
-        for (const line of lines) {
-          // Skip empty lines and comments
-          if (!line.trim() || line.trim().startsWith(":")) continue;
-          if (!line.trim().startsWith("data:")) continue;
-
-          try {
-            const dataStr = line.replace("data:", "").trim();
-            if (!dataStr) continue;
-
-            const data = JSON.parse(dataStr);
-
-            if (data.done) {
-              isDone = true;
-              metadata = data;
-              break;
-            }
-            if (data.error) throw new Error(data.error);
-            if (data.text) {
-              accumulated += data.text;
-
-              // Update the last message
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  sender: "pea",
-                  text: accumulated,
-                };
-                return updated;
-              });
-            }
-          } catch (e) {
-            console.error("Parse error:", e.message);
-          }
-        }
-      }
-
-      // Check for provider recommendations
-      if (
-        metadata?.shouldShowProviders &&
-        metadata?.recommendedProviders?.length > 0
-      ) {
-        setRecommendedProviders(metadata.recommendedProviders);
-
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "pea",
-              text: "You know what... I've been thinking about everything you're juggling. Would you be open to meeting some specialists who could help? I can introduce you to a few people who might really lighten the load. 💚",
-            },
-          ]);
+        // Provider recommendation flow
+        if (data.shouldShowProviders && data.recommendedProviders?.length > 0) {
+          setRecommendedProviders(data.recommendedProviders);
 
           setTimeout(() => {
             setMessages((prev) => [
               ...prev,
-              { sender: "system", action: "show_providers" },
+              {
+                sender: "pea",
+                text: "You know what... I've been thinking about everything you're juggling. Would you be open to meeting some specialists who could help? I can introduce you to a few people who might really lighten the load. 💚",
+              },
             ]);
-          }, 1000);
-        }, 2000);
+
+            setTimeout(() => {
+              setMessages((prev) => [
+                ...prev,
+                { sender: "system", action: "show_providers" },
+              ]);
+            }, 1000);
+          }, 2000);
+        }
+      } else {
+        // Add empty message that we'll update
+        setMessages((prev) => [...prev, { sender: "pea", text: "" }]);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        let isDone = false;
+        let metadata = null;
+
+        while (!isDone) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            // Skip empty lines and comments
+            if (!line.trim() || line.trim().startsWith(":")) continue;
+            if (!line.trim().startsWith("data:")) continue;
+
+            try {
+              const dataStr = line.replace("data:", "").trim();
+              if (!dataStr) continue;
+
+              const data = JSON.parse(dataStr);
+
+              if (data.done) {
+                isDone = true;
+                metadata = data;
+                break;
+              }
+              if (data.error) throw new Error(data.error);
+              if (data.text) {
+                accumulated += data.text;
+
+                // Update the last message
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    sender: "pea",
+                    text: accumulated,
+                  };
+                  return updated;
+                });
+              }
+            } catch (e) {
+              console.error("Parse error:", e.message);
+            }
+          }
+        }
+
+        // Check for provider recommendations
+        if (
+          metadata?.shouldShowProviders &&
+          metadata?.recommendedProviders?.length > 0
+        ) {
+          setRecommendedProviders(metadata.recommendedProviders);
+
+          setTimeout(() => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                sender: "pea",
+                text: "You know what... I've been thinking about everything you're juggling. Would you be open to meeting some specialists who could help? I can introduce you to a few people who might really lighten the load. 💚",
+              },
+            ]);
+
+            setTimeout(() => {
+              setMessages((prev) => [
+                ...prev,
+                { sender: "system", action: "show_providers" },
+              ]);
+            }, 1000);
+          }, 2000);
+        }
       }
     } catch (error) {
       console.error("Error:", error);
