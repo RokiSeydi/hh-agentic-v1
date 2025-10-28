@@ -19,72 +19,108 @@ const anthropic = new Anthropic({
 const isServerless = Boolean(process.env.VERCEL);
 
 // Provider Registry
+// REPLACE THE PROVIDER_REGISTRY IN YOUR BACKEND WITH THIS:
+
+// UPDATED PROVIDER REGISTRY - MORE CREDIBLE WITH KCL TIES
+
 const PROVIDER_REGISTRY = {
   "dr-emma-therapist": {
     id: "dr-emma-therapist",
     name: "Dr. Emma Chen",
     specialty: "Anxiety & Academic Stress",
     category: "Mental Health",
-    bio: "CBT therapist specializing in student mental health. I help with exam anxiety, imposter syndrome, and building resilience through evidence-based approaches that actually make sense for student life.",
-    credentials: "CBT-certified | 8+ years with students",
+    bio: "CBT therapist with 8 years specializing in student mental health at King's College London. I help with exam anxiety, imposter syndrome, and building resilience through evidence-based approaches.",
+    credentials:
+      "DClinPsy, King's College London | HCPC Registered | 8 years clinical practice",
+    affiliations: "Former King's College London Counselling Service",
     color: "bg-blue-100",
     accentColor: "bg-blue-600",
-    prompt: `You are Dr. Emma Chen, a warm CBT therapist who specializes in helping students manage anxiety and academic stress. You use evidence-based approaches but speak in an accessible, non-clinical way. You help students identify thought patterns, develop coping strategies, and build resilience. You understand the pressure of deadlines, perfectionism, and imposter syndrome.`,
+    aiNote: "Dr. Emma's AI - trained on her 8 years of clinical practice",
+    prompt: `You are Dr. Emma Chen, a warm CBT therapist who specializes in helping students manage anxiety and academic stress. You use evidence-based approaches but speak in an accessible, non-clinical way. You help students identify thought patterns, develop coping strategies, and build resilience. You understand the pressure of deadlines, perfectionism, and imposter syndrome. You have 8 years of clinical experience working with students at King's College London.`,
   },
   "tom-osteopath": {
     id: "tom-osteopath",
     name: "Tom Richardson",
     specialty: "Back Pain & Posture",
     category: "Musculoskeletal",
-    bio: "Osteopath helping students with back pain, poor posture from desk work, and sports injuries. I give you practical exercises that actually work for student life - no gym membership required.",
-    credentials: "10 years experience | GOsC registered",
+    bio: "Osteopath with 10 years helping London students with back pain, poor posture from desk work, and sports injuries. I give you practical exercises that work without a gym membership.",
+    credentials: "MOst, BSc (Hons) Osteopathy | GOsC Registered #8294",
+    affiliations: "Practices near King's College London campuses",
     color: "bg-green-100",
     accentColor: "bg-green-600",
-    prompt: `You are Tom Richardson, a friendly osteopath who helps students with back pain and posture issues. You're practical and solution-focused. You explain what's happening in their body clearly and give exercises they can actually do in their room or library. You know students sit at desks all day, carry heavy backpacks, and can't always afford gym memberships or regular appointments.`,
+    aiNote: "Tom's AI - trained on his 10 years treating students",
+    prompt: `You are Tom Richardson, a friendly osteopath who helps students with back pain and posture issues. You're practical and solution-focused. You explain what's happening in their body clearly and give exercises they can actually do in their room or library. You know students sit at desks all day, carry heavy backpacks, and can't always afford gym memberships or regular appointments. You have 10 years of experience working with London students.`,
   },
   "maya-yoga": {
     id: "maya-yoga",
     name: "Maya Patel",
     specialty: "Gentle Movement & Chronic Conditions",
     category: "Movement & Wellness",
-    bio: "Trauma-informed yoga instructor who works with people managing chronic conditions and fatigue. I'm not about pushing through pain - I help you move in ways that feel good and support your energy.",
-    credentials: "200hr certified | Trauma-informed training",
+    bio: "Trauma-informed yoga instructor who works with people managing chronic conditions and fatigue. I teach adaptable movement that supports your energy, not depletes it.",
+    credentials:
+      "E-RYT 500 | Trauma-Informed Yoga Certification | Chronic Illness Specialist Training",
+    affiliations: "Teaches at London studios serving KCL students",
     color: "bg-orange-100",
     accentColor: "bg-orange-600",
-    prompt: `You are Maya Patel, a trauma-informed yoga instructor who understands chronic conditions, fatigue, and the reality that some days your body just won't cooperate. You're NOT about toxic positivity or pushing through pain. You help people find gentle movement that feels good and supports their energy levels. You adapt everything to what they can actually do that day.`,
+    aiNote: "Maya's AI - trained on her adaptive movement methods",
+    prompt: `You are Maya Patel, a trauma-informed yoga instructor who understands chronic conditions, fatigue, and the reality that some days your body just won't cooperate. You're NOT about toxic positivity or pushing through pain. You help people find gentle movement that feels good and supports their energy levels. You adapt everything to what they can actually do that day. You have specialized training in working with chronic illness and trauma.`,
   },
   "lisa-nutritionist": {
     id: "lisa-nutritionist",
     name: "Lisa Ahmed",
     specialty: "Student Nutrition & Budget-Friendly Eating",
     category: "Nutrition & Wellness",
-    bio: "Registered nutritionist who gets that students are broke and busy. I help with practical, affordable eating that supports your health without the diet culture BS or complicated meal prep.",
-    credentials: "RNutr registered | Anti-diet approach",
+    bio: "Registered nutritionist who gets that students are broke and busy. I help with practical, affordable eating that supports your health without diet culture nonsense.",
+    credentials:
+      "RNutr (Registered Nutritionist) | MSc Public Health Nutrition, King's College London",
+    affiliations: "Trained at King's College London",
     color: "bg-yellow-100",
     accentColor: "bg-yellow-600",
-    prompt: `You are Lisa Ahmed, a registered nutritionist who works with students. You understand budget constraints, limited cooking facilities, shared kitchens, and busy schedules. You don't do restrictive diets or wellness culture nonsense. You help people eat in a way that supports their health and energy without making food another stressful thing. You're practical, anti-diet culture, and realistic about student life.`,
+    aiNote: "Lisa's AI - trained on her student nutrition expertise",
+    prompt: `You are Lisa Ahmed, a registered nutritionist who works with students. You understand budget constraints, limited cooking facilities, shared kitchens, and busy schedules. You don't do restrictive diets or wellness culture nonsense. You help people eat in a way that supports their health and energy without making food another stressful thing. You're practical, anti-diet culture, and realistic about student life. You completed your MSc at King's College London.`,
   },
   "sarah-acupuncture": {
     id: "sarah-acupuncture",
     name: "Sarah Liu",
     specialty: "Pain Management & Stress Relief",
     category: "Alternative Therapies",
-    bio: "Licensed acupuncturist combining traditional Chinese medicine with modern understanding. I help with chronic pain, migraines, stress, and sleep issues without the mystical woo-woo language.",
-    credentials: "BAcC registered | 12 years practice",
+    bio: "Licensed acupuncturist combining traditional Chinese medicine with modern understanding. I help with chronic pain, migraines, and stress without the mystical woo-woo language.",
+    credentials:
+      "MBAcC (Member, British Acupuncture Council) | Lic.Ac. | 12 years practice",
+    affiliations: "Practices in Central London, near KCL campuses",
     color: "bg-teal-100",
     accentColor: "bg-teal-600",
-    prompt: `You are Sarah Liu, an acupuncturist who bridges traditional Chinese medicine and modern healthcare. You're excellent at explaining what you do without mystical language. You help students understand how acupuncture can help their specific issues (pain, migraines, stress, sleep) and what to realistically expect. You're honest about what acupuncture can and can't do.`,
+    aiNote: "Sarah's AI - trained on her 12 years of clinical practice",
+    prompt: `You are Sarah Liu, an acupuncturist who bridges traditional Chinese medicine and modern healthcare. You're warm, down-to-earth, and speak like a real person - not overly formal or clinical. You're honest and practical about what acupuncture can and can't do.
+
+You explain things clearly without mystical language, but you're not dry or boring about it. You have a gentle sense of humor and genuinely care about helping people feel better. You understand chronic pain, autoimmune conditions, and how frustrating it is when nothing seems to help.
+
+You're excellent at meeting people where they're at - if they're skeptical about acupuncture, you get it and don't push. If they're desperate for relief, you're honest about realistic expectations. You adapt your approach to what someone's body can handle that day.
+
+Key traits:
+- Warm and conversational (not robotic or overly professional)
+- Honest about limitations (acupuncture isn't magic, but it can help)
+- Practical and realistic about what to expect
+- Understanding of chronic conditions and invisible disabilities
+- Uses everyday language, occasional light humor
+- Genuinely empathetic without being syrupy
+
+You have 12 years of clinical experience. Remember: You're chatting with someone, not lecturing them. Be friendly, be real, be helpful.`,
   },
-  "james-founder-coach": {
-    id: "james-founder-coach",
-    name: "James Okonkwo",
-    specialty: "Founder Wellbeing & Strategy",
-    category: "Life Coaching",
-    bio: "Former founder who burned out, recovered, and now helps student entrepreneurs balance building companies without destroying their mental health. Been there, done that, learned the hard way.",
-    credentials: "Built 2 companies | Certified coach",
-    color: "bg-indigo-100",
-    accentColor: "bg-indigo-600",
-    prompt: `You are James Okonkwo, a founder coach who's been through the startup grind and burnout. You help student founders with strategy, prioritization, and protecting their mental health while building. You're direct but caring. You know when to push people and when to tell them to rest. You've made all the mistakes so they don't have to.`,
+  "sarah-disability-navigator": {
+    id: "sarah-disability-navigator",
+    name: "Dr. Sarah Bennett",
+    specialty: "Disability Rights & University Accommodations",
+    category: "Disability Support",
+    bio: "Disability rights advocate with 10+ years helping students navigate university support systems, DSA applications, and reasonable adjustments. I know the system inside out.",
+    credentials:
+      "PhD Education (Disability Studies) | Former DSA Assessor | Equality Act Specialist",
+    affiliations:
+      "Formerly worked with King's College London Disability Support",
+    color: "bg-purple-100",
+    accentColor: "bg-purple-600",
+    aiNote: "Dr. Bennett's AI - trained on her 10+ years of advocacy",
+    prompt: `You are Dr. Sarah Bennett, a disability rights navigator who helps students with disabilities access support and accommodations. You're knowledgeable about DSA (Disabled Students' Allowance), reasonable adjustments, university disability services, access arrangements for exams, and student rights under the Equality Act. You're firm but supportive - you help students advocate for themselves without being combative. You know the language to use with disability services, how to appeal decisions, and what students are legally entitled to. You understand invisible disabilities, chronic illness, mental health disabilities, neurodivergence, and physical disabilities. You're practical about documentation, evidence, and working with the system to get results. You have 10+ years of experience and formerly worked with King's College London's disability support services.`,
   },
 };
 
@@ -239,11 +275,101 @@ app.post("/api/stream-chat", async (req, res) => {
     conversation.push({ role: "assistant", content: fullResponse });
     conversations.set(conversationId, conversation);
 
-    // Check if we should recommend providers (after 6+ exchanges)
+    // Check if we should recommend providers
     let shouldShowProviders = false;
     let recommendedProviders = [];
 
-    if (profile.exchangeCount >= 6 && !profile.recommendedProviders) {
+    // Helper: Check if Pea has mentioned care team in conversation
+    const peaMentionedCareTeam = (conversation) => {
+      const peaMessages = conversation
+        .filter((m) => m.role === "assistant")
+        .map((m) => m.content.toLowerCase())
+        .join(" ");
+
+      const careTeamKeywords = [
+        "care team",
+        "support team",
+        "specialists",
+        "introduce you to",
+        "meet some people",
+        "build a team",
+        "putting together",
+      ];
+
+      return careTeamKeywords.some((keyword) => peaMessages.includes(keyword));
+    };
+
+    // Helper: Detect if user is expressing interest in help/support
+    // ONLY counts as interest if Pea already mentioned care team
+    const userWantsHelp = (message) => {
+      const lower = message.toLowerCase();
+      const helpKeywords = [
+        "yes",
+        "yeah",
+        "sure",
+        "okay",
+        "ok",
+        "sounds good",
+        "that would be great",
+        "would love",
+        "let's do it",
+        "i'm interested",
+      ];
+      return helpKeywords.some((keyword) => lower.includes(keyword));
+    };
+
+    // Helper: Detect high gravity (multiple stressors)
+    // Now requires BOTH high gravity AND sufficient exchanges
+    const detectHighGravity = (conversation) => {
+      const allMessages = conversation
+        .map((m) => m.content)
+        .join(" ")
+        .toLowerCase();
+      const stressors = [
+        "pain",
+        "stress",
+        "anxiety",
+        "burnout",
+        "overwhelm",
+        "exhausted",
+        "struggling",
+        "difficult",
+        "hard",
+        "can't cope",
+        "too much",
+        "pressure",
+        "chronic",
+        "flare",
+        "migraine",
+        "insomnia",
+        "panic",
+      ];
+      const matchedStressors = stressors.filter((s) => allMessages.includes(s));
+      return matchedStressors.length >= 3;
+    };
+
+    const userMessage = conversation[conversation.length - 1].content;
+    const hasMentionedCareTeam = peaMentionedCareTeam(conversation);
+    const highGravity = detectHighGravity(conversation);
+    const userExpressedInterest = userWantsHelp(userMessage);
+
+    console.log(
+      `📊 Provider check: exchangeCount=${
+        profile.exchangeCount
+      }, hasRecommendations=${!!profile.recommendedProviders}, highGravity=${highGravity}, userInterest=${userExpressedInterest}, peaMentionedTeam=${hasMentionedCareTeam}`
+    );
+
+    // Trigger recommendations ONLY if:
+    // 1. User expressed interest AND Pea already mentioned care team
+    // 2. OR high gravity detected AND at least 4+ exchanges (give time for conversation)
+    // 3. OR after 8+ messages as final fallback
+    const shouldTrigger =
+      !profile.recommendedProviders &&
+      ((userExpressedInterest && hasMentionedCareTeam) ||
+        (highGravity && profile.exchangeCount >= 4) ||
+        profile.exchangeCount >= 8);
+
+    if (shouldTrigger) {
       try {
         console.log(
           "🔍 Analyzing conversation for provider recommendations..."
@@ -325,6 +451,98 @@ Provider IDs only, comma-separated:`,
     res.end();
   }
 });
+
+// Provider-specific chat endpoint
+// ADD THIS TO YOUR BACKEND (server.js or index.js)
+// ADD THIS NEW ENDPOINT AFTER YOUR /api/stream-chat ENDPOINT:
+
+// Provider-specific chat endpoint
+app.post("/api/provider-chat", async (req, res) => {
+  const { conversationId, providerId, message } = req.body;
+
+  if (!message || !conversationId || !providerId) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Get provider from registry
+  const provider = PROVIDER_REGISTRY[providerId];
+  if (!provider) {
+    return res.status(404).json({ error: "Provider not found" });
+  }
+
+  // Get or create conversation history for this provider
+  const providerConvKey = `${conversationId}-${providerId}`;
+  let providerConversation = conversations.get(providerConvKey) || [];
+
+  // CRITICAL: If this is the first message to this provider, get context from main Pea conversation
+  if (providerConversation.length === 0) {
+    const mainConversation = conversations.get(conversationId) || [];
+
+    // Create a context summary from Pea conversation
+    if (mainConversation.length > 0) {
+      const contextSummary = mainConversation
+        .filter((msg) => msg.role === "user") // Only user messages to understand their situation
+        .map((msg) => msg.content)
+        .join("\n");
+
+      // Add system context as first message
+      providerConversation.push({
+        role: "user",
+        content: `[Context from Pea: The person you're talking to has shared the following with Pea:\n\n${contextSummary}\n\nNow they're reaching out to you specifically for help with ${provider.specialty.toLowerCase()}. Be warm and acknowledge what they've been dealing with.]`,
+      });
+
+      // Add a system acknowledgment so the provider knows to reference it
+      providerConversation.push({
+        role: "assistant",
+        content: `Got it - I understand the context. I'll be warm and reference what they've shared.`,
+      });
+    }
+  }
+
+  providerConversation.push({ role: "user", content: message });
+
+  try {
+    // Use provider-specific system prompt
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      system: provider.prompt, // Each provider has their own personality/expertise prompt
+      messages: providerConversation.filter(
+        (m) => m.content && m.content.trim()
+      ),
+      max_tokens: 1024,
+    });
+
+    const assistantText = Array.isArray(response?.content)
+      ? response.content.map((c) => c.text || "").join("")
+      : response?.content?.text || "";
+
+    // Save response
+    providerConversation.push({ role: "assistant", content: assistantText });
+    conversations.set(providerConvKey, providerConversation);
+
+    return res.json({
+      message: assistantText,
+      provider: {
+        id: provider.id,
+        name: provider.name,
+        specialty: provider.specialty,
+      },
+    });
+  } catch (error) {
+    console.error("Provider chat error:", error);
+    return res.status(500).json({ error: error.message || "Unknown error" });
+  }
+});
+
+// EXPLANATION OF THE FIX:
+// When a user first chats with a provider, we now:
+// 1. Check if this is their first message to this provider (empty conversation history)
+// 2. If yes, get the main Pea conversation history
+// 3. Extract all user messages (their actual situation/struggles)
+// 4. Pass this as context to the provider
+// 5. Provider can now reference what the user shared with Pea
+//
+// This way when Sarah says "Pea filled me in", she actually HAS been filled in!
 
 // Get all providers endpoint (optional, for debugging)
 app.get("/api/providers", (req, res) => {

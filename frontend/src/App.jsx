@@ -1,5 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, ChevronLeft, Heart, X, Check, Loader2 } from "lucide-react";
+import {
+  Send,
+  ChevronLeft,
+  Heart,
+  X,
+  Check,
+  Loader2,
+  Leaf,
+} from "lucide-react";
 
 // For testing in Claude.ai, we'll use mock mode
 // Use Vite env var in production or fall back to relative paths when hosted on same domain
@@ -27,18 +35,18 @@ const MOCK_PROVIDERS = [
     accentColor: "bg-green-600",
   },
   {
-    id: "maya-yoga",
-    name: "Maya Patel",
-    specialty: "Gentle Yoga & Mobility",
-    category: "Movement & Fitness",
-    bio: "Yoga instructor specializing in mobility for people with chronic conditions. Not your typical gym bro - I work WITH your body.",
-    color: "bg-orange-100",
-    accentColor: "bg-orange-600",
+    id: "sarah-disability-navigator",
+    name: "Dr. Sarah Bennett",
+    specialty: "Disability Rights & University Accommodations",
+    category: "Disability Support",
+    bio: "Disability rights advocate who helps students navigate university support systems, DSA applications, and reasonable adjustments.",
+    color: "bg-purple-100",
+    accentColor: "bg-purple-600",
   },
 ];
 
 function App() {
-  const [view, setView] = useState("chat");
+  const [viewMode, setViewMode] = useState("chat-only"); // 'chat-only', 'split-screen', 'provider-chat', 'swipe', 'team'
   const [conversationId] = useState(() => `conv-${Date.now()}`);
   const [messages, setMessages] = useState([
     { sender: "pea", text: "Hey there! 👋" },
@@ -60,7 +68,24 @@ function App() {
   const [recommendedProviders, setRecommendedProviders] = useState([]);
   const [activeTeam, setActiveTeam] = useState([]);
   const [currentSwipeIndex, setCurrentSwipeIndex] = useState(0);
+
+  // NEW: Provider chat states
+  const [activeProvider, setActiveProvider] = useState(null);
+  const [providerConversations, setProviderConversations] = useState({});
+
+  // Typing indicator state with delay
+  const [showTyping, setShowTyping] = useState(false);
+
+  // Mobile split-screen toggle (show chat or providers on mobile)
+  const [mobileShowProviders, setMobileShowProviders] = useState(false);
+
   const messagesEndRef = useRef(null);
+
+  // Helper function to split message into paragraphs
+  const splitIntoParagraphs = (text) => {
+    const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());
+    return paragraphs.length > 0 ? paragraphs : [text];
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,7 +93,124 @@ function App() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, providerConversations]);
+
+  // Add randomized delay before showing typing indicator (1-2 seconds)
+  useEffect(() => {
+    let timer;
+    if (isLoading) {
+      // Random delay between 1000ms (1s) and 2000ms (2s)
+      const randomDelay = Math.floor(Math.random() * 1000) + 1000;
+      timer = setTimeout(() => {
+        setShowTyping(true);
+      }, randomDelay);
+    } else {
+      setShowTyping(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  const handleAddProvider = (provider) => {
+    if (!activeTeam.find((p) => p.id === provider.id)) {
+      setActiveTeam((prev) => [...prev, provider]);
+
+      // Show success message from Pea
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "pea",
+          text: `Great! I've added ${provider.name} to your care team. You can chat with them anytime 💙`,
+        },
+      ]);
+    }
+
+    // Move to next provider or go back to chat
+    if (currentSwipeIndex < recommendedProviders.length - 1) {
+      setCurrentSwipeIndex((prev) => prev + 1);
+    } else {
+      if (viewMode === "swipe") {
+        setViewMode("chat-only");
+      }
+    }
+  };
+
+  const handleSkipProvider = () => {
+    if (currentSwipeIndex < recommendedProviders.length - 1) {
+      setCurrentSwipeIndex((prev) => prev + 1);
+    } else {
+      if (viewMode === "swipe") {
+        setViewMode("chat-only");
+      }
+    }
+  };
+
+  // NEW: Start chat with a provider
+  const handleStartProviderChat = (provider) => {
+    setActiveProvider(provider);
+    setViewMode("provider-chat");
+
+    // Initialize conversation with provider if first time
+    if (!providerConversations[provider.id]) {
+      setProviderConversations((prev) => ({
+        ...prev,
+        [provider.id]: [
+          {
+            sender: "provider",
+            text: `Hey! I'm ${
+              provider.name
+            }. Pea gave me a heads up about what you've been dealing with, so I have some context. I'm here to help with ${provider.specialty.toLowerCase()}. What would you like to focus on?`,
+          },
+        ],
+      }));
+    }
+  };
+
+  // NEW: Send message to provider
+  const handleSendToProvider = async (message) => {
+    if (!activeProvider || !message.trim() || isLoading) return;
+
+    const providerId = activeProvider.id;
+
+    // Add user message
+    setProviderConversations((prev) => ({
+      ...prev,
+      [providerId]: [
+        ...(prev[providerId] || []),
+        { sender: "user", text: message },
+      ],
+    }));
+
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      // Call backend with provider-specific system prompt
+      const response = await fetch(`${API_URL}/api/provider-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerId: providerId,
+          conversationId: `${conversationId}-${providerId}`,
+          message: message,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Add provider response
+      setProviderConversations((prev) => ({
+        ...prev,
+        [providerId]: [
+          ...(prev[providerId] || []),
+          { sender: "provider", text: data.message },
+        ],
+      }));
+    } catch (error) {
+      console.error("Provider chat error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -129,10 +271,8 @@ function App() {
               },
             ]);
             setTimeout(() => {
-              setMessages((prev) => [
-                ...prev,
-                { sender: "system", action: "show_providers" },
-              ]);
+              setRecommendedProviders(MOCK_PROVIDERS);
+              setViewMode("split-screen"); // CHANGED: Show split-screen instead of swipe
             }, 1000);
           }, 2000);
         }
@@ -162,271 +302,299 @@ function App() {
         // ----- NON-STREAMING MODE (Vercel serverless) -----
         const data = await response.json();
 
-        // data looks like:
-        // {
-        //   message: "... full assistant reply ...",
-        //   shouldShowProviders: false,
-        //   recommendedProviders: []
-        // }
-
         // Add Pea's reply
         setMessages((prev) => [...prev, { sender: "pea", text: data.message }]);
 
-        // Provider recommendation flow
+        // Provider recommendation flow - CHANGED: Show split-screen
         if (data.shouldShowProviders && data.recommendedProviders?.length > 0) {
           setRecommendedProviders(data.recommendedProviders);
-
-          setTimeout(() => {
-            setMessages((prev) => [
-              ...prev,
-              {
-                sender: "pea",
-                text: "You know what... I've been thinking about everything you're juggling. Would you be open to meeting some specialists who could help? I can introduce you to a few people who might really lighten the load. 💚",
-              },
-            ]);
-
-            setTimeout(() => {
-              setMessages((prev) => [
-                ...prev,
-                { sender: "system", action: "show_providers" },
-              ]);
-            }, 1000);
-          }, 2000);
+          setViewMode("split-screen"); // Show split-screen instead of system message
         }
       } else {
+        // ----- STREAMING MODE (local development) -----
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
         // Add empty message that we'll update
         setMessages((prev) => [...prev, { sender: "pea", text: "" }]);
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulated = "";
-        let isDone = false;
-        let metadata = null;
+        let buffer = "";
+        let fullResponse = "";
 
-        while (!isDone) {
+        while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
-            // Skip empty lines and comments
-            if (!line.trim() || line.trim().startsWith(":")) continue;
-            if (!line.trim().startsWith("data:")) continue;
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
 
-            try {
-              const dataStr = line.replace("data:", "").trim();
-              if (!dataStr) continue;
+                if (data.text) {
+                  fullResponse += data.text;
+                  setMessages((prev) => {
+                    const newMessages = [...prev];
+                    newMessages[newMessages.length - 1].text = fullResponse;
+                    return newMessages;
+                  });
+                }
 
-              const data = JSON.parse(dataStr);
-
-              if (data.done) {
-                isDone = true;
-                metadata = data;
-                break;
+                // CHANGED: Show split-screen when providers recommended
+                if (data.done && data.shouldShowProviders) {
+                  setRecommendedProviders(data.recommendedProviders || []);
+                  if (data.recommendedProviders?.length > 0) {
+                    setViewMode("split-screen");
+                  }
+                }
+              } catch (e) {
+                console.error("Error parsing SSE data:", e);
               }
-              if (data.error) throw new Error(data.error);
-              if (data.text) {
-                accumulated += data.text;
-
-                // Update the last message
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    sender: "pea",
-                    text: accumulated,
-                  };
-                  return updated;
-                });
-              }
-            } catch (e) {
-              console.error("Parse error:", e.message);
             }
           }
         }
-
-        // Check for provider recommendations
-        if (
-          metadata?.shouldShowProviders &&
-          metadata?.recommendedProviders?.length > 0
-        ) {
-          setRecommendedProviders(metadata.recommendedProviders);
-
-          setTimeout(() => {
-            setMessages((prev) => [
-              ...prev,
-              {
-                sender: "pea",
-                text: "You know what... I've been thinking about everything you're juggling. Would you be open to meeting some specialists who could help? I can introduce you to a few people who might really lighten the load. 💚",
-              },
-            ]);
-
-            setTimeout(() => {
-              setMessages((prev) => [
-                ...prev,
-                { sender: "system", action: "show_providers" },
-              ]);
-            }, 1000);
-          }, 2000);
-        }
       }
+
+      setIsLoading(false);
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => {
-        const filtered = prev.filter((m) => m.text !== "");
-        return [
-          ...filtered,
-          {
-            sender: "pea",
-            text: "Sorry, I'm having trouble connecting. Make sure the backend is running! 🙏",
-          },
-        ];
-      });
-    } finally {
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "pea",
+          text: "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
+        },
+      ]);
       setIsLoading(false);
     }
   };
 
-  const handleShowProviders = () => {
-    // Use recommended providers if available, otherwise use mock
-    const providers = MOCK_MODE ? MOCK_PROVIDERS : recommendedProviders;
-    setRecommendedProviders(providers);
-    setCurrentSwipeIndex(0);
-    setView("swipe");
-  };
-
-  const handleAddProvider = (provider) => {
-    setActiveTeam((prev) => [...prev, provider]);
-    if (currentSwipeIndex < recommendedProviders.length - 1) {
-      setCurrentSwipeIndex((prev) => prev + 1);
-    } else {
-      finishSwipe();
-    }
-  };
-
-  const handleSkipProvider = () => {
-    if (currentSwipeIndex < recommendedProviders.length - 1) {
-      setCurrentSwipeIndex((prev) => prev + 1);
-    } else {
-      finishSwipe();
-    }
-  };
-
-  const finishSwipe = () => {
-    setTimeout(() => {
-      setView("chat");
-      const teamCount = activeTeam.length;
-      if (teamCount > 0) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "pea",
-            text: `Perfect! I've added ${teamCount + 1} specialist${
-              teamCount > 0 ? "s" : ""
-            } to your team. 💜\n\nThey're all coordinating in the background now - I'll keep you updated on what they're handling and what needs your attention. You're not alone in this anymore.`,
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "pea",
-            text: "No worries! You can meet the team anytime you're ready. For now, I'm here - how can I support you today?",
-          },
-        ]);
-      }
-    }, 500);
-  };
-
-  // CHAT VIEW
-  if (view === "chat") {
+  // SPLIT-SCREEN VIEW (NEW)
+  if (viewMode === "split-screen") {
     return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-purple-50 to-pink-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" fill="white" />
+      <div className="flex flex-col md:flex-row h-screen bg-white">
+        {/* LEFT SIDE - PEA CHAT */}
+        <div
+          className={`w-full md:w-1/2 border-r border-gray-200 flex flex-col ${
+            mobileShowProviders ? "hidden md:flex" : "flex"
+          }`}
+        >
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+              <Leaf className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg">Pea</h1>
-              <p className="text-xs text-gray-500">Your care coordinator</p>
+            <h1 className="font-semibold text-base">Pea</h1>
+            <div className="ml-auto flex gap-2">
+              <button
+                onClick={() => setMobileShowProviders(true)}
+                className="md:hidden text-sm bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg animate-pulse-glow hover:bg-green-800 transition"
+              >
+                View Team 👉
+              </button>
+              <button
+                onClick={() => setViewMode("team")}
+                className="hidden md:flex text-sm text-gray-600 hover:text-gray-900 items-center gap-1"
+              >
+                <Heart className="w-4 h-4" />
+                <span className="hidden sm:inline">Team</span> (
+                {activeTeam.length})
+              </button>
             </div>
           </div>
-          {activeTeam.length > 0 && (
-            <button
-              onClick={() => setView("team")}
-              className="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 transition"
-            >
-              Team ({activeTeam.length})
-            </button>
-          )}
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, idx) => {
-            if (msg.action === "show_providers") {
-              return (
-                <div key={idx} className="flex justify-center">
-                  <button
-                    onClick={handleShowProviders}
-                    className="bg-purple-600 text-white px-6 py-3 rounded-full hover:bg-purple-700 transition shadow-lg font-medium"
-                  >
-                    Meet Your Care Team ✨
-                  </button>
-                </div>
-              );
-            }
-
-            return (
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            {messages.map((msg, idx) => (
               <div
                 key={idx}
-                className={`flex ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
+                className={`mb-4 ${
+                  msg.sender === "user" ? "flex justify-end" : ""
                 }`}
               >
-                <div
-                  className={`max-w-xs md:max-w-md px-4 py-3 rounded-2xl ${
-                    msg.sender === "user"
-                      ? "bg-purple-600 text-white"
-                      : "bg-white text-gray-800 shadow-sm"
-                  }`}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                </div>
+                {msg.sender === "pea" &&
+                  splitIntoParagraphs(msg.text).map((para, pIdx) => (
+                    <div
+                      key={pIdx}
+                      className="bg-gray-100 rounded-2xl px-4 py-2.5 mb-2 text-[15px] leading-relaxed max-w-[85%]"
+                    >
+                      {para}
+                    </div>
+                  ))}
+                {msg.sender === "user" && (
+                  <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%]">
+                    {msg.text}
+                  </div>
+                )}
+                {msg.sender === "system" && msg.action === "show_providers" && (
+                  <button
+                    onClick={() => setViewMode("swipe")}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition"
+                  >
+                    Meet Your Care Team →
+                  </button>
+                )}
               </div>
-            );
-          })}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white px-4 py-3 rounded-2xl shadow-sm">
-                <Loader2 className="w-5 h-5 text-purple-600 animate-spin" />
+            ))}
+            {showTyping && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Pea is typing...</span>
               </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="border-t border-gray-200 p-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                placeholder="put it into words..."
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:border-green-500 text-[15px] placeholder:text-gray-500 placeholder:opacity-90"
+                disabled={isLoading}
+              />
+              <button
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+                className="bg-green-600 text-white p-2.5 rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
             </div>
-          )}
-          <div ref={messagesEndRef} />
+          </div>
         </div>
 
-        {/* Input */}
-        <div className="bg-white border-t p-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Message Pea..."
-              disabled={isLoading}
-              className="flex-1 px-4 py-3 border rounded-full focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:bg-gray-100"
-            />
+        {/* RIGHT SIDE - PROVIDER CARDS */}
+        <div
+          className={`w-full md:w-1/2 flex flex-col bg-gray-50 max-h-screen md:max-h-none ${
+            !mobileShowProviders ? "hidden md:flex" : "flex"
+          }`}
+        >
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-base">
+                Your Recommended Care Team
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Tap a specialist to start chatting
+              </p>
+            </div>
             <button
-              onClick={handleSend}
-              disabled={isLoading}
-              className="bg-purple-600 text-white p-3 rounded-full hover:bg-purple-700 transition disabled:opacity-50"
+              onClick={() => setMobileShowProviders(false)}
+              className="md:hidden text-gray-600 hover:text-gray-900"
             >
-              <Send className="w-5 h-5" />
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {recommendedProviders.map((provider, idx) => (
+              <div
+                key={idx}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                {/* Header with avatar and name */}
+                <div className="flex items-start gap-3 mb-3">
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      provider.name
+                    )}&background=${
+                      provider.accentColor
+                        ?.replace("bg-", "")
+                        .replace("-600", "") || "green"
+                    }&color=fff&size=128&bold=true`}
+                    alt={provider.name}
+                    className="w-12 h-12 rounded-full shrink-0 object-cover"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 text-base">
+                      {provider.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-0.5">
+                      {provider.specialty}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Credentials */}
+                {provider.credentials && (
+                  <div className="mb-3 pb-3 border-b border-gray-100">
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {provider.credentials}
+                    </p>
+                  </div>
+                )}
+
+                {/* Category badge */}
+                <div className="mb-3">
+                  <span className="inline-block text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full font-medium">
+                    {provider.category}
+                  </span>
+                </div>
+
+                {/* Bio */}
+                <p className="text-sm text-gray-700 leading-relaxed mb-3">
+                  {provider.bio}
+                </p>
+
+                {/* AI Twin badge */}
+                <div className="mb-4 pb-4 border-b border-gray-100">
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <p className="text-xs text-green-800 leading-relaxed">
+                      Start by speaking to{" "}
+                      <span className="font-semibold">
+                        {provider.name.split(" ")[0]}'s AI
+                      </span>{" "}
+                      — their digital extension trained on their expertise
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status badge */}
+                {activeTeam.some((p) => p.id === provider.id) && (
+                  <div className="mb-3">
+                    <span className="flex items-center gap-1 text-green-600 text-xs font-semibold">
+                      <Check className="w-4 h-4" />
+                      In Your Team
+                    </span>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {!activeTeam.some((p) => p.id === provider.id) && (
+                    <button
+                      onClick={() => handleAddProvider(provider)}
+                      className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                    >
+                      Add to Team
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleStartProviderChat(provider)}
+                    className="flex-1 border-2 border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition"
+                  >
+                    Chat Now
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-gray-200 p-4 bg-white">
+            <button
+              onClick={() => setViewMode("chat-only")}
+              className="w-full text-sm text-gray-600 hover:text-gray-900"
+            >
+              ← Back to Pea only
             </button>
           </div>
         </div>
@@ -434,67 +602,268 @@ function App() {
     );
   }
 
-  // SWIPE VIEW
-  if (view === "swipe" && recommendedProviders.length > 0) {
-    const currentProvider = recommendedProviders[currentSwipeIndex];
+  // PROVIDER CHAT VIEW (NEW)
+  if (viewMode === "provider-chat" && activeProvider) {
+    const providerMessages = providerConversations[activeProvider.id] || [];
 
     return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-purple-50 to-pink-50">
-        <div className="bg-white shadow-sm p-4 flex items-center justify-between">
+      <div className="flex flex-col h-screen bg-white">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
           <button
-            onClick={() => setView("chat")}
-            className="text-gray-600 hover:text-gray-800"
+            onClick={() => setViewMode("split-screen")}
+            className="text-green-600 hover:opacity-70 transition"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <p className="text-sm text-gray-600">
-            {currentSwipeIndex + 1} of {recommendedProviders.length}
-          </p>
+          <div
+            className={`w-10 h-10 ${
+              activeProvider.accentColor || "bg-green-600"
+            } rounded-full flex items-center justify-center text-white font-semibold`}
+          >
+            {activeProvider.name.charAt(0)}
+          </div>
+          <div>
+            <h1 className="font-semibold text-base">{activeProvider.name}</h1>
+            <p className="text-xs text-gray-600">{activeProvider.specialty}</p>
+          </div>
+          <div className="ml-auto">
+            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+              AI Twin
+            </span>
+          </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full overflow-hidden">
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          {providerMessages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`mb-4 ${
+                msg.sender === "user" ? "flex justify-end" : ""
+              }`}
+            >
+              {msg.sender === "provider" &&
+                splitIntoParagraphs(msg.text).map((para, pIdx) => (
+                  <div
+                    key={pIdx}
+                    className={`${
+                      activeProvider.color || "bg-gray-100"
+                    } rounded-2xl px-4 py-2.5 mb-2 text-[15px] leading-relaxed max-w-[85%]`}
+                  >
+                    {para}
+                  </div>
+                ))}
+              {msg.sender === "user" && (
+                <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%]">
+                  {msg.text}
+                </div>
+              )}
+            </div>
+          ))}
+          {showTyping && (
+            <div className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">
+                {activeProvider.name} is typing...
+              </span>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) =>
+                e.key === "Enter" && !isLoading && handleSendToProvider(input)
+              }
+              placeholder={`Message ${activeProvider.name}...`}
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:border-green-500 text-[15px] placeholder:text-gray-500 placeholder:opacity-90"
+              disabled={isLoading}
+            />
+            <button
+              onClick={() => handleSendToProvider(input)}
+              disabled={isLoading || !input.trim()}
+              className="bg-green-600 text-white p-2.5 rounded-full hover:bg-green-700 transition disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CHAT ONLY VIEW
+  if (viewMode === "chat-only") {
+    return (
+      <div className="flex flex-col h-screen bg-white">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+          <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+            <Leaf className="w-5 h-5 text-white" />
+          </div>
+          <h1 className="font-semibold text-base">Pea</h1>
+          <div className="ml-auto flex gap-2">
+            {activeTeam.length > 0 && (
+              <button
+                onClick={() => setViewMode("team")}
+                className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              >
+                <Heart className="w-4 h-4" />
+                Team ({activeTeam.length})
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`mb-4 ${
+                msg.sender === "user" ? "flex justify-end" : ""
+              }`}
+            >
+              {msg.sender === "pea" &&
+                splitIntoParagraphs(msg.text).map((para, pIdx) => (
+                  <div
+                    key={pIdx}
+                    className="bg-gray-100 rounded-2xl px-4 py-2.5 mb-2 text-[15px] leading-relaxed max-w-[85%] animate-fade-in"
+                  >
+                    {para}
+                  </div>
+                ))}
+              {msg.sender === "user" && (
+                <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%] animate-fade-in">
+                  {msg.text}
+                </div>
+              )}
+              {msg.sender === "system" && msg.action === "show_providers" && (
+                <button
+                  onClick={() => setViewMode("swipe")}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition animate-fade-in"
+                >
+                  Meet Your Care Team →
+                </button>
+              )}
+            </div>
+          ))}
+          {showTyping && (
+            <div className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Pea is typing...</span>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSend()}
+              placeholder="put it into words..."
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:border-green-500 text-[15px] placeholder:text-gray-500 placeholder:opacity-90"
+              disabled={isLoading}
+            />
+            <button
+              onClick={handleSend}
+              disabled={isLoading || !input.trim()}
+              className="bg-green-600 text-white p-2.5 rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SWIPE VIEW (keeping your original)
+  if (viewMode === "swipe" && recommendedProviders.length > 0) {
+    const currentProvider = recommendedProviders[currentSwipeIndex];
+
+    return (
+      <div className="flex flex-col h-screen bg-white">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+          <button
+            onClick={() => setViewMode("chat-only")}
+            className="text-green-600 hover:opacity-70 transition"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-2">
+            {recommendedProviders.map((_, idx) => (
+              <div
+                key={idx}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  idx === currentSwipeIndex
+                    ? "w-6 bg-green-600"
+                    : idx < currentSwipeIndex
+                    ? "w-1.5 bg-green-300"
+                    : "w-1.5 bg-gray-300"
+                }`}
+              />
+            ))}
+          </div>
+          <div className="w-6" />
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-lg max-w-md w-full overflow-hidden border border-gray-200 animate-fade-in">
             <div
               className={`${
-                currentProvider.color || "bg-purple-100"
+                currentProvider.color || "bg-gray-50"
               } p-8 text-center`}
             >
               <div
                 className={`w-24 h-24 ${
-                  currentProvider.accentColor || "bg-purple-600"
-                } rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold`}
+                  currentProvider.accentColor || "bg-green-600"
+                } rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-semibold shadow-md`}
               >
                 {currentProvider.name.charAt(0)}
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-1">
                 {currentProvider.name}
               </h2>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-gray-600 font-medium mt-2">
                 {currentProvider.specialty}
               </p>
-              <span className="inline-block mt-2 text-xs bg-white/50 px-3 py-1 rounded-full text-gray-700">
+              <span className="inline-block mt-3 text-xs bg-white/80 px-3 py-1 rounded-full text-gray-700 font-medium">
                 {currentProvider.category}
               </span>
             </div>
 
             <div className="p-6">
-              <p className="text-gray-700 leading-relaxed mb-6">
+              <p className="text-gray-700 leading-relaxed mb-6 text-[15px]">
                 {currentProvider.bio}
               </p>
 
               <div className="flex gap-3">
                 <button
                   onClick={handleSkipProvider}
-                  className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-full flex items-center justify-center gap-2 hover:bg-gray-50 transition"
+                  className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors font-medium text-sm"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                   Maybe Later
                 </button>
                 <button
                   onClick={() => handleAddProvider(currentProvider)}
-                  className="flex-1 bg-purple-600 text-white py-3 rounded-full flex items-center justify-center gap-2 hover:bg-purple-700 transition"
+                  className="flex-1 bg-green-600 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 hover:bg-green-700 transition-colors font-medium text-sm"
                 >
-                  <Check className="w-5 h-5" />
+                  <Check className="w-4 h-4" />
                   Add to Team
                 </button>
               </div>
@@ -505,44 +874,58 @@ function App() {
     );
   }
 
-  // TEAM VIEW
-  if (view === "team") {
+  // TEAM VIEW (keeping your original)
+  if (viewMode === "team") {
     return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-purple-50 to-pink-50">
-        <div className="bg-white shadow-sm p-4 flex items-center gap-3">
+      <div className="flex flex-col h-screen bg-white">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
           <button
-            onClick={() => setView("chat")}
-            className="text-gray-600 hover:text-gray-800"
+            onClick={() => setViewMode("chat-only")}
+            className="text-green-600 hover:opacity-70 transition"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <h1 className="font-bold text-lg">Your Care Team</h1>
+          <h1 className="font-semibold text-base">Your Care Team</h1>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {activeTeam.length === 0 ? (
-            <div className="text-center text-gray-500 mt-8">
-              <p>No specialists added yet.</p>
-              <p className="text-sm mt-2">Chat with Pea to build your team!</p>
+            <div className="text-center text-gray-500 mt-16 animate-fade-in">
+              <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <Heart className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-base font-medium text-gray-700">
+                No specialists yet
+              </p>
+              <p className="text-sm mt-1 text-gray-500">
+                Chat with Pea to build your team
+              </p>
             </div>
           ) : (
             activeTeam.map((provider, idx) => (
               <div
                 key={idx}
-                className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-4"
+                onClick={() => handleStartProviderChat(provider)}
+                className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors cursor-pointer animate-fade-in-up"
+                style={{ animationDelay: `${idx * 0.05}s` }}
               >
                 <div
                   className={`w-12 h-12 ${
-                    provider.accentColor || "bg-purple-600"
-                  } rounded-full flex items-center justify-center text-white font-bold`}
+                    provider.accentColor || "bg-green-600"
+                  } rounded-full flex items-center justify-center text-white font-semibold text-lg`}
                 >
                   {provider.name.charAt(0)}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-800">
+                  <h3 className="font-semibold text-gray-900 text-[15px]">
                     {provider.name}
                   </h3>
-                  <p className="text-sm text-gray-600">{provider.specialty}</p>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {provider.specialty}
+                  </p>
+                  <span className="inline-block mt-1.5 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
+                    {provider.category}
+                  </span>
                 </div>
               </div>
             ))
