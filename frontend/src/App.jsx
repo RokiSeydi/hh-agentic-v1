@@ -49,18 +49,14 @@ function App() {
   const [viewMode, setViewMode] = useState("chat-only"); // 'chat-only', 'split-screen', 'provider-chat', 'swipe', 'team'
   const [conversationId] = useState(() => `conv-${Date.now()}`);
   const [messages, setMessages] = useState([
-    { sender: "pea", text: "Hey there! 👋" },
+    { sender: "pea", text: "hey! 👋 i'm pea." },
     {
       sender: "pea",
-      text: "I'm Pea - think of me as your supportive friend who's here to listen and help you navigate whatever's going on with your health and wellbeing. Whether you're dealing with stress, physical symptoms, mental health stuff, or just need someone to talk through what's happening, I'm here for you.",
+      text: "i listen, but more importantly - i coordinate a real care team to actually help you.\n\nnot just advice, but real people, real support. because actions speak louder than words. 🫡",
     },
     {
       sender: "pea",
-      text: "I'm all about meeting you where you're at - no judgment, just genuine support and practical help when you need it.",
-    },
-    {
-      sender: "pea",
-      text: "So what's bringing you here today? What's on your mind? 💙",
+      text: "what's going on? 💙",
     },
   ]);
   const [input, setInput] = useState("");
@@ -387,10 +383,11 @@ function App() {
               <Leaf className="w-5 h-5 text-white" />
             </div>
             <h1 className="font-semibold text-base">Pea</h1>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex gap-2 items-center">
               <button
                 onClick={() => setMobileShowProviders(true)}
-                className="md:hidden text-sm bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg animate-pulse-glow hover:bg-green-800 transition"
+                className="md:hidden text-xs bg-green-700 text-white px-3 py-2 rounded-lg font-bold shadow-lg hover:bg-green-800 transition whitespace-nowrap"
+                style={{ minWidth: 'fit-content' }}
               >
                 View Team 👉
               </button>
@@ -413,17 +410,20 @@ function App() {
                   msg.sender === "user" ? "flex justify-end" : ""
                 }`}
               >
-                {msg.sender === "pea" &&
-                  splitIntoParagraphs(msg.text).map((para, pIdx) => (
-                    <div
-                      key={pIdx}
-                      className="bg-gray-100 rounded-2xl px-4 py-2.5 mb-2 text-[15px] leading-relaxed max-w-[85%]"
-                    >
-                      {para}
-                    </div>
-                  ))}
+                {msg.sender === "pea" && (
+                  <div className="flex flex-col gap-2 items-start max-w-[85%]">
+                    {splitIntoParagraphs(msg.text).map((para, pIdx) => (
+                      <div
+                        key={pIdx}
+                        className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word"
+                      >
+                        {para}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {msg.sender === "user" && (
-                  <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%]">
+                  <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%] inline-block wrap-break-word">
                     {msg.text}
                   </div>
                 )}
@@ -641,19 +641,22 @@ function App() {
                 msg.sender === "user" ? "flex justify-end" : ""
               }`}
             >
-              {msg.sender === "provider" &&
-                splitIntoParagraphs(msg.text).map((para, pIdx) => (
-                  <div
-                    key={pIdx}
-                    className={`${
-                      activeProvider.color || "bg-gray-100"
-                    } rounded-2xl px-4 py-2.5 mb-2 text-[15px] leading-relaxed max-w-[85%]`}
-                  >
-                    {para}
-                  </div>
-                ))}
+              {msg.sender === "provider" && (
+                <div className="flex flex-col gap-2 items-start max-w-[85%]">
+                  {splitIntoParagraphs(msg.text).map((para, pIdx) => (
+                    <div
+                      key={pIdx}
+                      className={`${
+                        activeProvider.color || "bg-gray-100"
+                      } rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word`}
+                    >
+                      {para}
+                    </div>
+                  ))}
+                </div>
+              )}
               {msg.sender === "user" && (
-                <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%]">
+                <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%] inline-block wrap-break-word">
                   {msg.text}
                 </div>
               )}
@@ -730,17 +733,20 @@ function App() {
                 msg.sender === "user" ? "flex justify-end" : ""
               }`}
             >
-              {msg.sender === "pea" &&
-                splitIntoParagraphs(msg.text).map((para, pIdx) => (
-                  <div
-                    key={pIdx}
-                    className="bg-gray-100 rounded-2xl px-4 py-2.5 mb-2 text-[15px] leading-relaxed max-w-[85%] animate-fade-in"
-                  >
-                    {para}
-                  </div>
-                ))}
+              {msg.sender === "pea" && (
+                <div className="flex flex-col gap-2 items-start max-w-[85%]">
+                  {splitIntoParagraphs(msg.text).map((para, pIdx) => (
+                    <div
+                      key={pIdx}
+                      className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed animate-fade-in wrap-break-word"
+                    >
+                      {para}
+                    </div>
+                  ))}
+                </div>
+              )}
               {msg.sender === "user" && (
-                <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%] animate-fade-in">
+                <div className="bg-green-600 text-white rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed max-w-[85%] animate-fade-in inline-block wrap-break-word">
                   {msg.text}
                 </div>
               )}
