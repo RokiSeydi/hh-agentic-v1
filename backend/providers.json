@@ -50,13 +50,13 @@
     "accentColor": "bg-teal-600"
   },
   {
-    "id": "james-founder-coach",
-    "name": "James Okonkwo",
-    "specialty": "Founder Wellbeing & Strategy",
-    "category": "Life Coaching",
-    "bio": "Former founder who burned out, recovered, and now helps student entrepreneurs balance building companies without destroying their mental health. Been there, done that, learned the hard way.",
-    "credentials": "Built 2 companies | Certified coach",
-    "color": "bg-indigo-100",
-    "accentColor": "bg-indigo-600"
+    "id": "sarah-disability-navigator",
+    "name": "Dr. Sarah Bennett",
+    "specialty": "Disability Rights & University Accommodations",
+    "category": "Disability Support",
+    "bio": "Disability rights advocate who helps students navigate university support systems, DSA applications, and reasonable adjustments.",
+    "credentials": "PhD in Disability Studies | 5 years experience",
+    "color": "bg-purple-100",
+    "accentColor": "bg-purple-600"
   }
 ]

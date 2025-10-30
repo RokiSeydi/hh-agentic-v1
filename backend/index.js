@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "redis";
 import PEA_SYSTEM_PROMPT from "./peaSystemPrompt.js";
 
 // Load environment variables
@@ -14,6 +15,27 @@ const PORT = process.env.PORT || 3001;
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+// Initialize Redis client
+let redis;
+async function initRedis() {
+  try {
+    redis = createClient({
+      url: process.env.REDIS_URL,
+    });
+
+    redis.on("error", (err) => console.error("Redis Client Error", err));
+    redis.on("connect", () => console.log("✅ Redis connected"));
+
+    await redis.connect();
+  } catch (error) {
+    console.error("Failed to connect to Redis:", error);
+    console.log("⚠️  Running without Redis - conversations will not persist");
+  }
+}
+
+// Initialize Redis on startup
+initRedis();
 
 // Detect serverless environment (Vercel sets VERCEL=1)
 const isServerless = Boolean(process.env.VERCEL);
@@ -124,9 +146,64 @@ You have 12 years of clinical experience. Remember: You're chatting with someone
   },
 };
 
-// Store conversations and user profiles in memory (use a DB in production)
-const conversations = new Map();
-const userProfiles = new Map();
+// Helper functions for Redis storage
+async function getConversation(conversationId) {
+  if (!redis) return [];
+  try {
+    const data = await redis.get(`conversation:${conversationId}`);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error("Error getting conversation:", error);
+    return [];
+  }
+}
+
+async function saveConversation(conversationId, messages) {
+  if (!redis) return;
+  try {
+    // Store with 7-day TTL (in seconds)
+    await redis.setEx(
+      `conversation:${conversationId}`,
+      60 * 60 * 24 * 7, // 7 days
+      JSON.stringify(messages)
+    );
+  } catch (error) {
+    console.error("Error saving conversation:", error);
+  }
+}
+
+async function getUserProfile(conversationId) {
+  if (!redis) return { exchangeCount: 0, recommendedProviders: null };
+  try {
+    const data = await redis.get(`profile:${conversationId}`);
+    return data
+      ? JSON.parse(data)
+      : {
+          exchangeCount: 0,
+          recommendedProviders: null,
+        };
+  } catch (error) {
+    console.error("Error getting profile:", error);
+    return {
+      exchangeCount: 0,
+      recommendedProviders: null,
+    };
+  }
+}
+
+async function saveUserProfile(conversationId, profile) {
+  if (!redis) return;
+  try {
+    // Store with 7-day TTL (in seconds)
+    await redis.setEx(
+      `profile:${conversationId}`,
+      60 * 60 * 24 * 7, // 7 days
+      JSON.stringify(profile)
+    );
+  } catch (error) {
+    console.error("Error saving profile:", error);
+  }
+}
 
 // Middleware
 app.use(
@@ -154,12 +231,9 @@ app.post("/api/stream-chat", async (req, res) => {
     return res.status(400).json({ error: "Missing conversationId or message" });
   }
 
-  // Get or create conversation history and profile
-  let conversation = conversations.get(conversationId) || [];
-  let profile = userProfiles.get(conversationId) || {
-    exchangeCount: 0,
-    recommendedProviders: null,
-  };
+  // Get or create conversation history and profile from KV
+  let conversation = await getConversation(conversationId);
+  let profile = await getUserProfile(conversationId);
 
   conversation.push({ role: "user", content: message });
   profile.exchangeCount += 1;
@@ -181,7 +255,7 @@ app.post("/api/stream-chat", async (req, res) => {
 
       // Save complete response to conversation history
       conversation.push({ role: "assistant", content: assistantText });
-      conversations.set(conversationId, conversation);
+      await saveConversation(conversationId, conversation);
 
       // (Optional) run provider recommendation logic here synchronously
       let shouldShowProviders = false;
@@ -215,7 +289,7 @@ app.post("/api/stream-chat", async (req, res) => {
             .filter(Boolean);
           if (recommendedProviders.length) {
             profile.recommendedProviders = recommendedProviders;
-            userProfiles.set(conversationId, profile);
+            await saveUserProfile(conversationId, profile);
             shouldShowProviders = true;
           }
         } catch (err) {
@@ -273,7 +347,7 @@ app.post("/api/stream-chat", async (req, res) => {
 
     // Save complete response to conversation history
     conversation.push({ role: "assistant", content: fullResponse });
-    conversations.set(conversationId, conversation);
+    await saveConversation(conversationId, conversation);
 
     // Check if we should recommend providers
     let shouldShowProviders = false;
@@ -369,7 +443,12 @@ app.post("/api/stream-chat", async (req, res) => {
         (highGravity && profile.exchangeCount >= 4) ||
         profile.exchangeCount >= 8);
 
-    if (shouldTrigger) {
+    // If providers already exist, always show them (stay persistent)
+    if (profile.recommendedProviders) {
+      console.log("✅ Showing existing providers (persistent view)");
+      recommendedProviders = profile.recommendedProviders;
+      shouldShowProviders = true;
+    } else if (shouldTrigger) {
       try {
         console.log(
           "🔍 Analyzing conversation for provider recommendations..."
@@ -400,7 +479,7 @@ Available providers:
 - maya-yoga: Gentle movement, chronic fatigue, autoimmune conditions, mobility
 - lisa-nutritionist: Budget-friendly eating, meal planning, energy management
 - sarah-acupuncture: Chronic pain, migraines, stress relief, sleep issues
-- james-founder-coach: Startup stress, burnout prevention, work-life balance, prioritization
+- sarah-disability-navigator: Disability rights, university accommodations, DSA applications
 
 Provider IDs only, comma-separated:`,
             },
@@ -424,7 +503,7 @@ Provider IDs only, comma-separated:`,
         if (recommendedProviders.length > 0) {
           profile.recommendedProviders = recommendedProviders;
           shouldShowProviders = true;
-          userProfiles.set(conversationId, profile);
+          await saveUserProfile(conversationId, profile);
           console.log(
             "✅ Providers recommended:",
             recommendedProviders.map((p) => p.name)
@@ -472,11 +551,11 @@ app.post("/api/provider-chat", async (req, res) => {
 
   // Get or create conversation history for this provider
   const providerConvKey = `${conversationId}-${providerId}`;
-  let providerConversation = conversations.get(providerConvKey) || [];
+  let providerConversation = await getConversation(providerConvKey);
 
   // CRITICAL: If this is the first message to this provider, get context from main Pea conversation
   if (providerConversation.length === 0) {
-    const mainConversation = conversations.get(conversationId) || [];
+    const mainConversation = await getConversation(conversationId);
 
     // Create a context summary from Pea conversation
     if (mainConversation.length > 0) {
@@ -518,7 +597,7 @@ app.post("/api/provider-chat", async (req, res) => {
 
     // Save response
     providerConversation.push({ role: "assistant", content: assistantText });
-    conversations.set(providerConvKey, providerConversation);
+    await saveConversation(providerConvKey, providerConversation);
 
     return res.json({
       message: assistantText,
@@ -555,6 +634,65 @@ app.post("/api/clear-conversation", (req, res) => {
   conversations.delete(conversationId);
   userProfiles.delete(conversationId);
   res.json({ success: true });
+});
+
+// Dismiss provider recommendations
+app.post("/api/dismiss-providers", async (req, res) => {
+  try {
+    const { conversationId } = req.body;
+
+    // Get existing profile
+    const profile = await getUserProfile(conversationId);
+
+    // Remove recommended providers
+    delete profile.recommendedProviders;
+
+    // Save updated profile
+    await saveUserProfile(conversationId, profile);
+
+    console.log(`✅ Dismissed providers for conversation ${conversationId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error dismissing providers:", error);
+    res.status(500).json({ error: "Failed to dismiss providers" });
+  }
+});
+
+// Load conversation history (for page refresh)
+app.post("/api/load-conversation", async (req, res) => {
+  try {
+    const { conversationId } = req.body;
+
+    // Get main Pea conversation
+    const messages = await getConversation(conversationId);
+
+    // Get user profile (for recommended providers)
+    const profile = await getUserProfile(conversationId);
+
+    // Get all provider conversations
+    const providerConversations = {};
+    if (
+      profile.recommendedProviders &&
+      profile.recommendedProviders.length > 0
+    ) {
+      for (const provider of profile.recommendedProviders) {
+        const providerConvKey = `${conversationId}-${provider.id}`;
+        const providerMessages = await getConversation(providerConvKey);
+        if (providerMessages.length > 0) {
+          providerConversations[provider.id] = providerMessages;
+        }
+      }
+    }
+
+    res.json({
+      messages: messages || [],
+      recommendedProviders: profile.recommendedProviders || [],
+      providerConversations: providerConversations,
+    });
+  } catch (error) {
+    console.error("Error loading conversation:", error);
+    res.status(500).json({ error: "Failed to load conversation" });
+  }
 });
 
 // Start server (only for local development)

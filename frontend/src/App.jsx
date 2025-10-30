@@ -7,6 +7,7 @@ import {
   Check,
   Loader2,
   Leaf,
+  ArrowDown,
 } from "lucide-react";
 
 // For testing in Claude.ai, we'll use mock mode
@@ -47,7 +48,17 @@ const MOCK_PROVIDERS = [
 
 function App() {
   const [viewMode, setViewMode] = useState("chat-only"); // 'chat-only', 'split-screen', 'provider-chat', 'swipe', 'team'
-  const [conversationId] = useState(() => `conv-${Date.now()}`);
+  // (convo id persists across page refreshes):
+  const [conversationId] = useState(() => {
+    // Check if user already has a conversation
+    const saved = localStorage.getItem("pea_conversation_id");
+    if (saved) return saved;
+
+    // Generate new one if first time
+    const newId = `conv-${Date.now()}`;
+    localStorage.setItem("pea_conversation_id", newId);
+    return newId;
+  });
   const [messages, setMessages] = useState([
     { sender: "pea", text: "hey! 👋 i'm pea." },
     {
@@ -75,7 +86,11 @@ function App() {
   // Mobile split-screen toggle (show chat or providers on mobile)
   const [mobileShowProviders, setMobileShowProviders] = useState(false);
 
+  // Show scroll to bottom button when user scrolls up
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   // Helper function to split message into paragraphs
   const splitIntoParagraphs = (text) => {
@@ -85,7 +100,70 @@ function App() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollButton(false);
   };
+
+  // Check if user has scrolled up (to show scroll button)
+  const handleScroll = (e) => {
+    const container = e.target;
+    const isScrolledUp =
+      container.scrollHeight - container.scrollTop - container.clientHeight >
+      100;
+    setShowScrollButton(isScrolledUp);
+  };
+
+  // Load conversation from backend on mount (for page refresh persistence)
+  useEffect(() => {
+    const loadConversation = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/load-conversation`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId }),
+        });
+
+        const data = await response.json();
+
+        // If we have saved messages, use them (but keep initial Pea greeting if empty)
+        if (data.messages && data.messages.length > 0) {
+          // Convert from backend format (role/content) to frontend format (sender/text)
+          const formattedMessages = data.messages.map((msg) => ({
+            sender: msg.role === "user" ? "user" : "pea",
+            text: msg.content,
+          }));
+          setMessages(formattedMessages);
+        }
+
+        // Restore recommended providers if they exist
+        if (data.recommendedProviders && data.recommendedProviders.length > 0) {
+          setRecommendedProviders(data.recommendedProviders);
+          setViewMode("split-screen"); // Auto-show split screen if providers exist
+        }
+
+        // Restore provider conversations
+        if (data.providerConversations) {
+          const formattedProviderConvos = {};
+
+          for (const [providerId, messages] of Object.entries(
+            data.providerConversations
+          )) {
+            // Convert backend format (role/content) to frontend format (sender/text)
+            formattedProviderConvos[providerId] = messages.map((msg) => ({
+              sender: msg.role === "user" ? "user" : "provider",
+              text: msg.content,
+            }));
+          }
+
+          setProviderConversations(formattedProviderConvos);
+        }
+      } catch (error) {
+        console.error("Failed to load conversation:", error);
+        // Keep default greeting messages on error
+      }
+    };
+
+    loadConversation();
+  }, [conversationId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -140,6 +218,23 @@ function App() {
     }
   };
 
+  // Dismiss provider recommendations permanently
+  const handleDismissProviders = async () => {
+    try {
+      await fetch(`http://localhost:3001/api/dismiss-providers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId }),
+      });
+
+      // Clear from frontend
+      setRecommendedProviders([]);
+      setViewMode("chat-only");
+    } catch (error) {
+      console.error("Failed to dismiss providers:", error);
+    }
+  };
+
   // NEW: Start chat with a provider
   const handleStartProviderChat = (provider) => {
     setActiveProvider(provider);
@@ -149,14 +244,7 @@ function App() {
     if (!providerConversations[provider.id]) {
       setProviderConversations((prev) => ({
         ...prev,
-        [provider.id]: [
-          {
-            sender: "provider",
-            text: `Hey! I'm ${
-              provider.name
-            }. Pea gave me a heads up about what you've been dealing with, so I have some context. I'm here to help with ${provider.specialty.toLowerCase()}. What would you like to focus on?`,
-          },
-        ],
+        [provider.id]: [], // Empty - user sends first message, THEN backend adds context
       }));
     }
   };
@@ -186,7 +274,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           providerId: providerId,
-          conversationId: `${conversationId}-${providerId}`,
+          conversationId: conversationId, // Send the main conversationId, backend will construct provider-specific key
           message: message,
         }),
       });
@@ -387,7 +475,7 @@ function App() {
               <button
                 onClick={() => setMobileShowProviders(true)}
                 className="md:hidden text-xs bg-green-700 text-white px-3 py-2 rounded-lg font-bold shadow-lg hover:bg-green-800 transition whitespace-nowrap"
-                style={{ minWidth: 'fit-content' }}
+                style={{ minWidth: "fit-content" }}
               >
                 View Team 👉
               </button>
@@ -402,7 +490,11 @@ function App() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-6">
+          <div
+            ref={chatContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto px-4 py-6 relative"
+          >
             {messages.map((msg, idx) => (
               <div
                 key={idx}
@@ -444,6 +536,17 @@ function App() {
               </div>
             )}
             <div ref={messagesEndRef} />
+
+            {/* Scroll to bottom button */}
+            {showScrollButton && (
+              <button
+                onClick={scrollToBottom}
+                className="fixed bottom-24 right-6 md:right-auto md:left-[45%] bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition z-50 md:hidden"
+                aria-label="Scroll to bottom"
+              >
+                <ArrowDown className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
           <div className="border-t border-gray-200 p-4">
@@ -589,12 +692,18 @@ function App() {
             ))}
           </div>
 
-          <div className="border-t border-gray-200 p-4 bg-white">
+          <div className="border-t border-gray-200 p-4 bg-white space-y-2">
             <button
               onClick={() => setViewMode("chat-only")}
-              className="w-full text-sm text-gray-600 hover:text-gray-900"
+              className="w-full text-sm text-gray-600 hover:text-gray-900 py-2"
             >
-              ← Back to Pea only
+              ← Back to Pea
+            </button>
+            <button
+              onClick={handleDismissProviders}
+              className="w-full text-sm text-red-600 hover:text-red-700 py-2 border border-red-200 rounded-lg hover:bg-red-50 transition"
+            >
+              Dismiss Recommendations
             </button>
           </div>
         </div>
@@ -628,12 +737,16 @@ function App() {
           </div>
           <div className="ml-auto">
             <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-              AI Twin
+              {activeProvider.aiNote || "AI Specialist • Available 24/7"}
             </span>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div
+          ref={chatContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 py-6 relative"
+        >
           {providerMessages.map((msg, idx) => (
             <div
               key={idx}
@@ -671,6 +784,17 @@ function App() {
             </div>
           )}
           <div ref={messagesEndRef} />
+
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <button
+              onClick={scrollToBottom}
+              className="fixed bottom-24 right-6 bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition z-50 md:hidden"
+              aria-label="Scroll to bottom"
+            >
+              <ArrowDown className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         <div className="border-t border-gray-200 p-4">
@@ -713,6 +837,15 @@ function App() {
           </div>
           <h1 className="font-semibold text-base">Pea</h1>
           <div className="ml-auto flex gap-2">
+            {/* Show "View Your Team" button if providers are recommended */}
+            {recommendedProviders.length > 0 && (
+              <button
+                onClick={() => setViewMode("split-screen")}
+                className="text-xs bg-green-700 text-white px-3 py-2 rounded-lg font-bold shadow-lg hover:bg-green-800 transition whitespace-nowrap"
+              >
+                View Your Team 👉
+              </button>
+            )}
             {activeTeam.length > 0 && (
               <button
                 onClick={() => setViewMode("team")}
@@ -725,7 +858,11 @@ function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div
+          ref={chatContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 py-6 relative"
+        >
           {messages.map((msg, idx) => (
             <div
               key={idx}
@@ -767,6 +904,17 @@ function App() {
             </div>
           )}
           <div ref={messagesEndRef} />
+
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <button
+              onClick={scrollToBottom}
+              className="fixed bottom-24 right-6 bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition z-50 md:hidden"
+              aria-label="Scroll to bottom"
+            >
+              <ArrowDown className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         <div className="border-t border-gray-200 p-4">
