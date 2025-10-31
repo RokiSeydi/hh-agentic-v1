@@ -18,8 +18,20 @@ const anthropic = new Anthropic({
 
 // Initialize Redis client
 let redis;
+let redisInitializing = false;
+let redisInitialized = false;
+
 async function initRedis() {
+  if (redisInitialized || redisInitializing) return redis;
+  
+  redisInitializing = true;
   try {
+    if (!process.env.REDIS_URL) {
+      console.log("⚠️  No REDIS_URL found - conversations will not persist");
+      redisInitializing = false;
+      return null;
+    }
+
     redis = createClient({
       url: process.env.REDIS_URL,
     });
@@ -28,14 +40,21 @@ async function initRedis() {
     redis.on("connect", () => console.log("✅ Redis connected"));
 
     await redis.connect();
+    redisInitialized = true;
+    redisInitializing = false;
+    return redis;
   } catch (error) {
     console.error("Failed to connect to Redis:", error);
     console.log("⚠️  Running without Redis - conversations will not persist");
+    redisInitializing = false;
+    return null;
   }
 }
 
-// Initialize Redis on startup
-initRedis();
+// Initialize Redis on startup (for non-serverless)
+if (!process.env.VERCEL) {
+  initRedis();
+}
 
 // Detect serverless environment (Vercel sets VERCEL=1)
 const isServerless = Boolean(process.env.VERCEL);
@@ -148,6 +167,7 @@ You have 12 years of clinical experience. Remember: You're chatting with someone
 
 // Helper functions for Redis storage
 async function getConversation(conversationId) {
+  await initRedis(); // Ensure Redis is initialized
   if (!redis) return [];
   try {
     const data = await redis.get(`conversation:${conversationId}`);
@@ -159,6 +179,7 @@ async function getConversation(conversationId) {
 }
 
 async function saveConversation(conversationId, messages) {
+  await initRedis(); // Ensure Redis is initialized
   if (!redis) return;
   try {
     // Store with 7-day TTL (in seconds)
@@ -173,6 +194,7 @@ async function saveConversation(conversationId, messages) {
 }
 
 async function getUserProfile(conversationId) {
+  await initRedis(); // Ensure Redis is initialized
   if (!redis) return { exchangeCount: 0, recommendedProviders: null };
   try {
     const data = await redis.get(`profile:${conversationId}`);
@@ -192,6 +214,7 @@ async function getUserProfile(conversationId) {
 }
 
 async function saveUserProfile(conversationId, profile) {
+  await initRedis(); // Ensure Redis is initialized
   if (!redis) return;
   try {
     // Store with 7-day TTL (in seconds)
