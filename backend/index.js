@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 // Initialize Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const gemini = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 // Initialize Redis client
 let redis;
 let redisInitializing = false;
@@ -262,7 +263,7 @@ app.post("/api/stream-chat", async (req, res) => {
   if (isServerless) {
     try {
       const response = await gemini.messages.create({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash-exp",
         system: PEA_SYSTEM_PROMPT,
         messages: conversation.filter((m) => m.content && m.content.trim()),
         max_tokens: 1024,
@@ -283,7 +284,7 @@ app.post("/api/stream-chat", async (req, res) => {
       if (profile.exchangeCount >= 6 && !profile.recommendedProviders) {
         try {
           const recommendationResponse = await gemini.messages.create({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             max_tokens: 200,
             system: `You are an expert at matching students with healthcare providers. Respond ONLY with provider IDs, comma-separated.`,
             messages: [
@@ -341,22 +342,37 @@ app.post("/api/stream-chat", async (req, res) => {
 
   try {
     // Create Gemini stream
-    const stream = await gemini.messages.stream({
-      model: "gemini-2.5-flash",
+    /*const stream = await gemini.messages.stream({
+      model: "gemini-2.0-flash-exp",
       system: PEA_SYSTEM_PROMPT,
       messages: conversation.filter((m) => m.content && m.content.trim()),
       max_tokens: 1024,
-    });
-
+    });*/
+    const stream = await gemini.generateContentStream({
+  contents: conversation
+    .filter((m) => m.content && m.content.trim())
+    .map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    })),
+  systemInstruction: {
+    parts: [{ text: PEA_SYSTEM_PROMPT }]
+  },
+  generationConfig: {
+    maxOutputTokens: 1024,
+  }
+});
+   
     let fullResponse = "";
 
     // Process each chunk
-    for await (const event of stream) {
-      if (
+    for await (const event of stream.stream) {
+    /*  if (
         event.type === "content_block_delta" &&
         event.delta?.type === "text_delta"
-      ) {
-        const text = event.delta.text;
+      ) */{
+        //const text = event.delta.text;
+        const text = event.text();
         fullResponse += text;
 
         // Send the text chunk
@@ -480,7 +496,7 @@ app.post("/api/stream-chat", async (req, res) => {
 
         // Ask Claude to recommend providers
         const recommendationResponse = await gemini.messages.create({
-          model: "gemini-2.5-flash",
+          model: "gemini-2.0-flash-exp",
           max_tokens: 200,
           system: `You are an expert at matching students with healthcare providers. 
 Analyze conversations and recommend 2-3 providers who would be most helpful.
@@ -602,7 +618,7 @@ app.post("/api/provider-chat", async (req, res) => {
   try {
     // Use provider-specific system prompt
     const response = await gemini.messages.create({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       system: provider.prompt, // Each provider has their own personality/expertise prompt
       messages: providerConversation.filter(
         (m) => m.content && m.content.trim()

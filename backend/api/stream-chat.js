@@ -41,7 +41,7 @@ app.post("/api/stream-chat", async (req, res) => {
 
   try {
     const stream = await gemini.messages.stream({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       system: PEA_SYSTEM_PROMPT,
       messages: conversation.filter((m) => m.content && m.content.trim()),
       max_tokens: 1024,

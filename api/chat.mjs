@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     }
 
     const body = {
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       system: PEA_SYSTEM_PROMPT,
       messages: [{ role: "user", content: message }],
       max_tokens: 1024,

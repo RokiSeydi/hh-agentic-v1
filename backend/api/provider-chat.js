@@ -70,7 +70,7 @@ app.post("/api/provider-chat", async (req, res) => {
   try {
     // Use provider-specific system prompt
     const response = await gemini.messages.create({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       system: provider.prompt, // Each provider has their own personality/expertise prompt
       messages: providerConversation.filter(
         (m) => m.content && m.content.trim()
