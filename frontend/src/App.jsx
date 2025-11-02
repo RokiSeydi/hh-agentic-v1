@@ -138,6 +138,11 @@ function App() {
         if (data.recommendedProviders && data.recommendedProviders.length > 0) {
           setRecommendedProviders(data.recommendedProviders);
           setViewMode("split-screen"); // Auto-show split screen if providers exist
+          
+          // On mobile, show providers panel automatically on first load
+          if (window.innerWidth < 768) {
+            setMobileShowProviders(true);
+          }
         }
 
         // Restore provider conversations
@@ -393,6 +398,11 @@ function App() {
         if (data.shouldShowProviders && data.recommendedProviders?.length > 0) {
           setRecommendedProviders(data.recommendedProviders);
           setViewMode("split-screen"); // Show split-screen instead of system message
+          
+          // On mobile, show providers panel automatically
+          if (window.innerWidth < 768) {
+            setMobileShowProviders(true);
+          }
         }
       } else {
         // ----- STREAMING MODE (local development) -----
@@ -432,6 +442,10 @@ function App() {
                   setRecommendedProviders(data.recommendedProviders || []);
                   if (data.recommendedProviders?.length > 0) {
                     setViewMode("split-screen");
+                    // On mobile, show providers panel automatically
+                    if (window.innerWidth < 768) {
+                      setMobileShowProviders(true);
+                    }
                   }
                 }
               } catch (e) {
