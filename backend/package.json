@@ -9,6 +9,7 @@
     "start:dev": "nodemon index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@google/generative-ai": "^0.21.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",

@@ -564,10 +564,11 @@ function App() {
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:border-green-500 text-[15px] placeholder:text-gray-500 placeholder:opacity-90 resize-none max-h-32 min-h-[42px]"
                 disabled={isLoading}
                 rows={1}
-                style={{ height: 'auto' }}
+                style={{ height: "auto" }}
                 onInput={(e) => {
-                  e.target.style.height = 'auto';
-                  e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px';
+                  e.target.style.height = "auto";
+                  e.target.style.height =
+                    Math.min(e.target.scrollHeight, 128) + "px";
                 }}
               />
               <button
@@ -822,10 +823,11 @@ function App() {
               className="flex-1 px-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:border-green-500 text-[15px] placeholder:text-gray-500 placeholder:opacity-90 resize-none max-h-32 min-h-[42px]"
               disabled={isLoading}
               rows={1}
-              style={{ height: 'auto' }}
+              style={{ height: "auto" }}
               onInput={(e) => {
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px';
+                e.target.style.height = "auto";
+                e.target.style.height =
+                  Math.min(e.target.scrollHeight, 128) + "px";
               }}
             />
             <button
@@ -950,10 +952,11 @@ function App() {
               className="flex-1 px-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:border-green-500 text-[15px] placeholder:text-gray-500 placeholder:opacity-90 resize-none max-h-32 min-h-[42px]"
               disabled={isLoading}
               rows={1}
-              style={{ height: 'auto' }}
+              style={{ height: "auto" }}
               onInput={(e) => {
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px';
+                e.target.style.height = "auto";
+                e.target.style.height =
+                  Math.min(e.target.scrollHeight, 128) + "px";
               }}
             />
             <button
