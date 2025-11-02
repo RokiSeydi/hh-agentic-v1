@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "redis";
 import PEA_SYSTEM_PROMPT from "./peaSystemPrompt.js";
 
@@ -10,12 +10,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
+// Initialize Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Initialize Redis client
 let redis;
 let redisInitializing = false;
@@ -265,8 +261,8 @@ app.post("/api/stream-chat", async (req, res) => {
   // If we're in a serverless environment (Vercel) we cannot reliably use long-lived SSE streams.
   if (isServerless) {
     try {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5-20250929",
+      const response = await gemini.messages.create({
+        model: "gemini-2.5-flash",
         system: PEA_SYSTEM_PROMPT,
         messages: conversation.filter((m) => m.content && m.content.trim()),
         max_tokens: 1024,
@@ -286,8 +282,8 @@ app.post("/api/stream-chat", async (req, res) => {
 
       if (profile.exchangeCount >= 6 && !profile.recommendedProviders) {
         try {
-          const recommendationResponse = await anthropic.messages.create({
-            model: "claude-sonnet-4-5-20250929",
+          const recommendationResponse = await gemini.messages.create({
+            model: "gemini-2.5-flash",
             max_tokens: 200,
             system: `You are an expert at matching students with healthcare providers. Respond ONLY with provider IDs, comma-separated.`,
             messages: [
@@ -344,9 +340,9 @@ app.post("/api/stream-chat", async (req, res) => {
   res.write(": connected\n\n");
 
   try {
-    // Create Anthropic stream
-    const stream = await anthropic.messages.stream({
-      model: "claude-sonnet-4-5-20250929",
+    // Create Gemini stream
+    const stream = await gemini.messages.stream({
+      model: "gemini-2.5-flash",
       system: PEA_SYSTEM_PROMPT,
       messages: conversation.filter((m) => m.content && m.content.trim()),
       max_tokens: 1024,
@@ -483,8 +479,8 @@ app.post("/api/stream-chat", async (req, res) => {
           .join("\n");
 
         // Ask Claude to recommend providers
-        const recommendationResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-5-20250929",
+        const recommendationResponse = await gemini.messages.create({
+          model: "gemini-2.5-flash",
           max_tokens: 200,
           system: `You are an expert at matching students with healthcare providers. 
 Analyze conversations and recommend 2-3 providers who would be most helpful.
@@ -605,8 +601,8 @@ app.post("/api/provider-chat", async (req, res) => {
 
   try {
     // Use provider-specific system prompt
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+    const response = await gemini.messages.create({
+      model: "gemini-2.5-flash",
       system: provider.prompt, // Each provider has their own personality/expertise prompt
       messages: providerConversation.filter(
         (m) => m.content && m.content.trim()
@@ -723,7 +719,7 @@ if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () => {
     console.log(`✅ Backend running on http://localhost:${PORT}`);
     console.log(
-      `✅ API Key configured: ${process.env.ANTHROPIC_API_KEY ? "Yes" : "No"}`
+      `✅ API Key configured: ${process.env.GEMINI_API_KEY ? "Yes" : "No"}`
     );
     console.log(
       `✅ Providers loaded: ${Object.keys(PROVIDER_REGISTRY).length}`

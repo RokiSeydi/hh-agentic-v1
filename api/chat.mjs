@@ -14,30 +14,30 @@ export default async function handler(req, res) {
         .json({ error: "Missing conversationId or message" });
     }
 
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) {
-      return res.status(500).json({ error: "Missing Anthropic API key" });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return res.status(500).json({ error: "Missing Gemini API key" });
     }
 
     const body = {
-      model: "claude-sonnet-4-5-20250929",
+      model: "gemini-2.5-flash",
       system: PEA_SYSTEM_PROMPT,
       messages: [{ role: "user", content: message }],
       max_tokens: 1024,
     };
 
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
+        "x-api-key": geminiKey,
       },
       body: JSON.stringify(body),
     });
 
     if (!r.ok) {
       const text = await r.text();
-      console.error("Anthropic error:", r.status, text);
+      console.error("Gemini error:", r.status, text);
       return res.status(502).json({ error: "Model API error" });
     }
 

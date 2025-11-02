@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import PEA_SYSTEM_PROMPT from "../peaSystemPrompt.js";
 import app from "../index.js";
 
@@ -9,10 +9,7 @@ dotenv.config();
 
 const app = express();
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const conversations = new Map();
 const userProfiles = new Map();
 
@@ -43,8 +40,8 @@ app.post("/api/stream-chat", async (req, res) => {
   res.write(": connected\n\n");
 
   try {
-    const stream = await anthropic.messages.stream({
-      model: "claude-sonnet-4-5-20250929",
+    const stream = await gemini.messages.stream({
+      model: "gemini-2.5-flash",
       system: PEA_SYSTEM_PROMPT,
       messages: conversation.filter((m) => m.content && m.content.trim()),
       max_tokens: 1024,

@@ -16,10 +16,10 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: Date.now(), port });
 });
 
-// Placeholder endpoint showing Anthropic usage (no real call)
+// Placeholder endpoint showing Gemini usage (no real call)
 app.post("/api/stream-chat", (req, res) => {
   const { message } = req.body || {};
-  // Normally you'd call Anthropic here using process.env.ANTHROPIC_API_KEY
+  // Normally you'd call Gemini here using process.env.GEMINI_API_KEY
   res.json({ reply: `Echo: ${message || ""}`, source: "placeholder" });
 });
 

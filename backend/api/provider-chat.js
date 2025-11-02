@@ -5,16 +5,14 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import app from "../index.js";
 
 dotenv.config();
 
 const app = express();
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const conversations = new Map();
 const userProfiles = new Map();
@@ -71,8 +69,8 @@ app.post("/api/provider-chat", async (req, res) => {
 
   try {
     // Use provider-specific system prompt
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+    const response = await gemini.messages.create({
+      model: "gemini-2.5-flash",
       system: provider.prompt, // Each provider has their own personality/expertise prompt
       messages: providerConversation.filter(
         (m) => m.content && m.content.trim()
