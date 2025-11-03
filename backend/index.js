@@ -12,7 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 // Initialize Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const gemini = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const gemini = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 // Initialize Redis client
 let redis;
 let redisInitializing = false;
@@ -495,7 +495,7 @@ app.post("/api/stream-chat", async (req, res) => {
           .join("\n");
 
         // Ask Claude to recommend providers
-        const recommendationResponse = await gemini.messages.create({
+        /*const recommendationResponse = await gemini.messages.create({
           model: "gemini-2.0-flash-exp",
           max_tokens: 200,
           system: `You are an expert at matching students with healthcare providers. 
@@ -520,12 +520,51 @@ Provider IDs only, comma-separated:`,
             },
           ],
         });
+*/
 
-        const recommendedIds = recommendationResponse.content[0].text
-          .trim()
+const recommendationResponse = await gemini.generateContent({
+  contents: [
+    {
+      role: "user",
+      parts: [{
+        text: `Based on this conversation, recommend 2-3 providers:
+
+${conversationSummary}
+
+Available providers:
+- dr-emma-therapist: Anxiety, exam stress, imposter syndrome, academic pressure
+- tom-osteopath: Back pain, posture, desk work injuries, joint problems
+- maya-yoga: Gentle movement, chronic fatigue, autoimmune conditions, mobility
+- lisa-nutritionist: Budget-friendly eating, meal planning, energy management
+- sarah-acupuncture: Chronic pain, migraines, stress relief, sleep issues
+- sarah-disability-navigator: Disability rights, university accommodations, DSA applications
+
+Provider IDs only, comma-separated:`
+      }]
+    }
+  ],
+  systemInstruction: {
+    parts: [{
+      text: `You are an expert at matching students with healthcare providers. 
+Analyze conversations and recommend 2-3 providers who would be most helpful.
+Respond ONLY with provider IDs, comma-separated.`
+    }]
+  },
+  generationConfig: {
+    maxOutputTokens: 200,
+  }
+});
+
+// Get the response text
+        const recommendedIds = recommendationResponse.response.text().trim()
           .toLowerCase()
           .split(",")
           .map((id) => id.trim());
+      /*  const recommendedIds = recommendationResponse.content[0].text
+          .trim()
+          .toLowerCase()
+          .split(",")
+          .map((id) => id.trim());*/
 
         console.log("💡 Recommended provider IDs:", recommendedIds);
 
