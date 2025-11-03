@@ -331,10 +331,22 @@ app.post("/api/stream-chat", async (req, res) => {
             messages: [
               {
                 role: "user",
-                content: `Based on this conversation, recommend 2-3 providers:\n\n${conversation
-                  .map((msg) => `${msg.role}: ${msg.content}`)
-                  .join("\n")}
-\nProvider IDs only, comma-separated:`,
+                content: `Based on this conversation, recommend 2-3 providers:\n\n
+           ${conversation
+             .filter((m) => m.role === "user") // Only user messages
+             .slice(-5) // Only last 5 user messages
+             .map((msg) => msg.content)
+             .join("\n")}
+
+Available providers:
+- dr-emma-therapist: Anxiety, stress, academic pressure
+- tom-osteopath: Back pain, posture issues
+- maya-yoga: Chronic fatigue, gentle movement
+- lisa-nutritionist: Budget eating, energy
+- sarah-acupuncture: Chronic pain, migraines
+- sarah-disability-navigator: Disability accommodations
+
+Provider IDs only, comma-separated:`,
               },
             ],
           });
