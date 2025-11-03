@@ -216,11 +216,19 @@ async function saveUserProfile(conversationId, profile) {
   await initRedis(); // Ensure Redis is initialized
   if (!redis) return;
   try {
+    const serialized = JSON.stringify(profile);
+    console.log('💾 Saving profile to Redis:', {
+      conversationId,
+      profileKeys: Object.keys(profile),
+      recommendedProvidersCount: profile.recommendedProviders?.length || 0,
+      recommendedProviderIds: profile.recommendedProviders?.map(p => p?.id) || [],
+      serializedLength: serialized.length
+    });
     // Store with 7-day TTL (in seconds)
     await redis.setEx(
       `profile:${conversationId}`,
       60 * 60 * 24 * 7, // 7 days
-      JSON.stringify(profile)
+      serialized
     );
   } catch (error) {
     console.error("Error saving profile:", error);
@@ -311,6 +319,11 @@ app.post("/api/stream-chat", async (req, res) => {
             .filter(Boolean);
           if (recommendedProviders.length) {
             profile.recommendedProviders = recommendedProviders;
+            console.log('💾 Saving providers to profile (serverless):', {
+              conversationId,
+              providerIds: recommendedProviders.map(p => p.id),
+              providerNames: recommendedProviders.map(p => p.name)
+            });
             await saveUserProfile(conversationId, profile);
             shouldShowProviders = true;
           }
@@ -690,6 +703,14 @@ app.post("/api/load-conversation", async (req, res) => {
 
     // Get user profile (for recommended providers)
     const profile = await getUserProfile(conversationId);
+    
+    console.log('🔍 Profile from Redis:', {
+      conversationId,
+      hasProfile: !!profile,
+      recommendedProviders: profile.recommendedProviders,
+      providerCount: profile.recommendedProviders?.length || 0,
+      exchangeCount: profile.exchangeCount
+    });
 
     // Get all provider conversations
     const providerConversations = {};
