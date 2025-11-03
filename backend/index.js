@@ -266,6 +266,15 @@ app.post("/api/stream-chat", async (req, res) => {
   let conversation = await getConversation(conversationId);
   let profile = await getUserProfile(conversationId);
 
+  console.log("💬 Conversation loaded:", {
+    conversationId,
+    messageCount: conversation.length,
+    userMessages: conversation.filter((m) => m.role === "user").length,
+    lastMessages: conversation
+      .slice(-3)
+      .map((m) => ({ role: m.role, preview: m.content?.substring(0, 50) })),
+  });
+
   // Fix for existing conversations: sync exchangeCount with actual message history
   // Count user messages (exchanges) in the conversation history
   const actualUserMessageCount = conversation.filter(
@@ -311,6 +320,10 @@ app.post("/api/stream-chat", async (req, res) => {
 
       if (profile.exchangeCount >= 6 && !profile.recommendedProviders) {
         try {
+          console.log(
+            "🔍 ATTEMPTING to analyze conversation for provider recommendations..."
+          );
+          console.log("📊 Conversation length:", conversation.length);
           const recommendationResponse = await anthropic.messages.create({
             model: "claude-sonnet-4-20250514",
             max_tokens: 200,
