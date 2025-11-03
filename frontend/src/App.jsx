@@ -88,6 +88,7 @@ function App() {
 
   // Show scroll to bottom button when user scrolls up
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(true);
 
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -123,13 +124,13 @@ function App() {
         });
 
         const data = await response.json();
-        
-        console.log('🔍 Load conversation data:', {
+
+        console.log("🔍 Load conversation data:", {
           hasMessages: !!data.messages,
           messageCount: data.messages?.length || 0,
           hasProviders: !!data.recommendedProviders,
           providerCount: data.recommendedProviders?.length || 0,
-          providers: data.recommendedProviders
+          providers: data.recommendedProviders,
         });
 
         // If we have saved messages, use them (but keep initial Pea greeting if empty)
@@ -172,6 +173,9 @@ function App() {
       } catch (error) {
         console.error("Failed to load conversation:", error);
         // Keep default greeting messages on error
+      } finally {
+        // Always set loading to false, whether success or error
+        setIsLoadingConversation(false);
       }
     };
 
@@ -196,6 +200,18 @@ function App() {
     }
     return () => clearTimeout(timer);
   }, [isLoading]);
+
+  // conversation loading state
+  if (isLoadingConversation) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleAddProvider = (provider) => {
     if (!activeTeam.find((p) => p.id === provider.id)) {
@@ -404,7 +420,10 @@ function App() {
 
         // Provider recommendation flow - CHANGED: Show split-screen
         if (data.shouldShowProviders && data.recommendedProviders?.length > 0) {
-          console.log('🎯 Providers recommended (serverless):', data.recommendedProviders);
+          console.log(
+            "🎯 Providers recommended (serverless):",
+            data.recommendedProviders
+          );
           setRecommendedProviders(data.recommendedProviders);
           setViewMode("split-screen"); // Show split-screen instead of system message
 
@@ -448,7 +467,6 @@ function App() {
 
                 // CHANGED: Show split-screen when providers recommended
                 if (data.done && data.shouldShowProviders) {
-                  console.log('🎯 Providers recommended (streaming):', data.recommendedProviders);
                   setRecommendedProviders(data.recommendedProviders || []);
                   if (data.recommendedProviders?.length > 0) {
                     setViewMode("split-screen");

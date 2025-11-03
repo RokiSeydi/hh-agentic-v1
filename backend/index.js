@@ -22,7 +22,7 @@ let redisInitialized = false;
 
 async function initRedis() {
   if (redisInitialized || redisInitializing) return redis;
-  
+
   redisInitializing = true;
   try {
     if (!process.env.REDIS_URL) {
@@ -217,12 +217,13 @@ async function saveUserProfile(conversationId, profile) {
   if (!redis) return;
   try {
     const serialized = JSON.stringify(profile);
-    console.log('💾 Saving profile to Redis:', {
+    console.log("💾 Saving profile to Redis:", {
       conversationId,
       profileKeys: Object.keys(profile),
       recommendedProvidersCount: profile.recommendedProviders?.length || 0,
-      recommendedProviderIds: profile.recommendedProviders?.map(p => p?.id) || [],
-      serializedLength: serialized.length
+      recommendedProviderIds:
+        profile.recommendedProviders?.map((p) => p?.id) || [],
+      serializedLength: serialized.length,
     });
     // Store with 7-day TTL (in seconds)
     await redis.setEx(
@@ -267,17 +268,21 @@ app.post("/api/stream-chat", async (req, res) => {
 
   // Fix for existing conversations: sync exchangeCount with actual message history
   // Count user messages (exchanges) in the conversation history
-  const actualUserMessageCount = conversation.filter(m => m.role === 'user').length;
-  
+  const actualUserMessageCount = conversation.filter(
+    (m) => m.role === "user"
+  ).length;
+
   // If profile counter is way behind actual conversation, catch it up
   if (actualUserMessageCount > profile.exchangeCount) {
-    console.log(`🔄 Syncing exchangeCount: ${profile.exchangeCount} → ${actualUserMessageCount}`);
+    console.log(
+      `🔄 Syncing exchangeCount: ${profile.exchangeCount} → ${actualUserMessageCount}`
+    );
     profile.exchangeCount = actualUserMessageCount;
   }
 
   conversation.push({ role: "user", content: message });
   profile.exchangeCount += 1;
-  
+
   // Save profile with updated exchange count
   await saveUserProfile(conversationId, profile);
 
@@ -332,10 +337,10 @@ app.post("/api/stream-chat", async (req, res) => {
             .filter(Boolean);
           if (recommendedProviders.length) {
             profile.recommendedProviders = recommendedProviders;
-            console.log('💾 Saving providers to profile (serverless):', {
+            console.log("💾 Saving providers to profile (serverless):", {
               conversationId,
-              providerIds: recommendedProviders.map(p => p.id),
-              providerNames: recommendedProviders.map(p => p.name)
+              providerIds: recommendedProviders.map((p) => p.id),
+              providerNames: recommendedProviders.map((p) => p.name),
             });
             await saveUserProfile(conversationId, profile);
             shouldShowProviders = true;
@@ -716,13 +721,13 @@ app.post("/api/load-conversation", async (req, res) => {
 
     // Get user profile (for recommended providers)
     const profile = await getUserProfile(conversationId);
-    
-    console.log('🔍 Profile from Redis:', {
+
+    console.log("🔍 Profile from Redis:", {
       conversationId,
       hasProfile: !!profile,
       recommendedProviders: profile.recommendedProviders,
       providerCount: profile.recommendedProviders?.length || 0,
-      exchangeCount: profile.exchangeCount
+      exchangeCount: profile.exchangeCount,
     });
 
     // Get all provider conversations
