@@ -265,6 +265,16 @@ app.post("/api/stream-chat", async (req, res) => {
   let conversation = await getConversation(conversationId);
   let profile = await getUserProfile(conversationId);
 
+  // Fix for existing conversations: sync exchangeCount with actual message history
+  // Count user messages (exchanges) in the conversation history
+  const actualUserMessageCount = conversation.filter(m => m.role === 'user').length;
+  
+  // If profile counter is way behind actual conversation, catch it up
+  if (actualUserMessageCount > profile.exchangeCount) {
+    console.log(`🔄 Syncing exchangeCount: ${profile.exchangeCount} → ${actualUserMessageCount}`);
+    profile.exchangeCount = actualUserMessageCount;
+  }
+
   conversation.push({ role: "user", content: message });
   profile.exchangeCount += 1;
   
