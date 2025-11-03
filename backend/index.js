@@ -268,7 +268,7 @@ app.post("/api/stream-chat", async (req, res) => {
         model: "claude-sonnet-4-20250514",
         system: PEA_SYSTEM_PROMPT,
         messages: conversation.filter((m) => m.content && m.content.trim()),
-        max_tokens: 1024,
+        max_tokens: 2048,
       });
 
       const assistantText = Array.isArray(response?.content)
@@ -348,7 +348,7 @@ app.post("/api/stream-chat", async (req, res) => {
       model: "claude-sonnet-4-20250514",
       system: PEA_SYSTEM_PROMPT,
       messages: conversation.filter((m) => m.content && m.content.trim()),
-      max_tokens: 1024,
+      max_tokens: 2048,
     });
 
     let fullResponse = "";
@@ -610,7 +610,7 @@ app.post("/api/provider-chat", async (req, res) => {
       messages: providerConversation.filter(
         (m) => m.content && m.content.trim()
       ),
-      max_tokens: 1024,
+      max_tokens: 2048,
     });
 
     const assistantText = Array.isArray(response?.content)

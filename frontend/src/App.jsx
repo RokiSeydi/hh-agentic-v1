@@ -123,6 +123,14 @@ function App() {
         });
 
         const data = await response.json();
+        
+        console.log('🔍 Load conversation data:', {
+          hasMessages: !!data.messages,
+          messageCount: data.messages?.length || 0,
+          hasProviders: !!data.recommendedProviders,
+          providerCount: data.recommendedProviders?.length || 0,
+          providers: data.recommendedProviders
+        });
 
         // If we have saved messages, use them (but keep initial Pea greeting if empty)
         if (data.messages && data.messages.length > 0) {
@@ -138,7 +146,7 @@ function App() {
         if (data.recommendedProviders && data.recommendedProviders.length > 0) {
           setRecommendedProviders(data.recommendedProviders);
           setViewMode("split-screen"); // Auto-show split screen if providers exist
-          
+
           // On mobile, show providers panel automatically on first load
           if (window.innerWidth < 768) {
             setMobileShowProviders(true);
@@ -396,9 +404,10 @@ function App() {
 
         // Provider recommendation flow - CHANGED: Show split-screen
         if (data.shouldShowProviders && data.recommendedProviders?.length > 0) {
+          console.log('🎯 Providers recommended (serverless):', data.recommendedProviders);
           setRecommendedProviders(data.recommendedProviders);
           setViewMode("split-screen"); // Show split-screen instead of system message
-          
+
           // On mobile, show providers panel automatically
           if (window.innerWidth < 768) {
             setMobileShowProviders(true);
@@ -439,6 +448,7 @@ function App() {
 
                 // CHANGED: Show split-screen when providers recommended
                 if (data.done && data.shouldShowProviders) {
+                  console.log('🎯 Providers recommended (streaming):', data.recommendedProviders);
                   setRecommendedProviders(data.recommendedProviders || []);
                   if (data.recommendedProviders?.length > 0) {
                     setViewMode("split-screen");
