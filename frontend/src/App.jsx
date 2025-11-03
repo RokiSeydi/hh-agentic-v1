@@ -63,11 +63,11 @@ function App() {
     { sender: "pea", text: "hey! 👋 i'm pea." },
     {
       sender: "pea",
-      text: "i listen, but more importantly - i coordinate a real care team to actually help you.\n\nnot just advice, but real people, real support. because actions speak louder than words. 🫡",
+      text: "i listen, but more importantly - i connect you with medical providers to shadow and learn from. real mentorship, real experience. because actions speak louder than words. 🫡",
     },
     {
       sender: "pea",
-      text: "what's going on? 💙",
+      text: "btw - i speak English, Mandarin (普通话), and Cantonese (粵語). whatever's most comfortable for you, i'm here. what specialty are you interested in learning about? 💙",
     },
   ]);
   const [input, setInput] = useState("");
