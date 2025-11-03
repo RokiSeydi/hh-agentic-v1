@@ -267,6 +267,9 @@ app.post("/api/stream-chat", async (req, res) => {
 
   conversation.push({ role: "user", content: message });
   profile.exchangeCount += 1;
+  
+  // Save profile with updated exchange count
+  await saveUserProfile(conversationId, profile);
 
   // Set SSE headers
   // If we're in a serverless environment (Vercel) we cannot reliably use long-lived SSE streams.
