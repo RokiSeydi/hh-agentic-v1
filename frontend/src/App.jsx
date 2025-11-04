@@ -9,6 +9,7 @@ import {
   Leaf,
   ArrowDown,
 } from "lucide-react";
+import posthog from "posthog-js";
 
 // For testing in Claude.ai, we'll use mock mode
 // Use Vite env var in production or fall back to relative paths when hosted on same domain
@@ -176,6 +177,14 @@ function App() {
       } finally {
         // Always set loading to false, whether success or error
         setIsLoadingConversation(false);
+        
+        // Track user session
+        posthog.identify(conversationId);
+        posthog.capture("session_started", {
+          has_history: data?.messages?.length > 0,
+          message_count: data?.messages?.length || 0,
+          has_providers: data?.recommendedProviders?.length > 0,
+        });
       }
     };
 
@@ -268,6 +277,13 @@ function App() {
   const handleStartProviderChat = (provider) => {
     setActiveProvider(provider);
     setViewMode("provider-chat");
+    
+    // Track provider chat started (key activation metric!)
+    posthog.capture("provider_chat_started", {
+      provider_id: provider.id,
+      provider_name: provider.name,
+      provider_specialty: provider.specialty,
+    });
 
     // Initialize conversation with provider if first time
     if (!providerConversations[provider.id]) {
@@ -295,6 +311,13 @@ function App() {
 
     setInput("");
     setIsLoading(true);
+    
+    // Track provider message sent
+    posthog.capture("provider_message_sent", {
+      provider_id: providerId,
+      provider_name: activeProvider.name,
+      message_length: message.length,
+    });
 
     try {
       // Call backend with provider-specific system prompt
@@ -332,6 +355,11 @@ function App() {
     setMessages((prev) => [...prev, { sender: "user", text: userMessage }]);
     setInput("");
     setIsLoading(true);
+    
+    // Track message sent
+    posthog.capture("message_sent", {
+      message_length: userMessage.length,
+    });
 
     try {
       if (MOCK_MODE) {
@@ -426,6 +454,12 @@ function App() {
           );
           setRecommendedProviders(data.recommendedProviders);
           setViewMode("split-screen"); // Show split-screen instead of system message
+          
+          // Track provider recommendation
+          posthog.capture("providers_recommended", {
+            provider_count: data.recommendedProviders.length,
+            provider_ids: data.recommendedProviders.map((p) => p.id),
+          });
 
           // On mobile, show providers panel automatically
           if (window.innerWidth < 768) {
