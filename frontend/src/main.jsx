@@ -7,11 +7,10 @@ import posthog from "posthog-js";
 // Initialize PostHog
 if (import.meta.env.VITE_POSTHOG_KEY) {
   posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-    api_host: "https://app.posthog.com",
-    // Capture pageviews automatically
-    capture_pageview: true,
-    // Respect user privacy
-    opt_out_capturing_by_default: false,
+    api_host: "https://eu.i.posthog.com", // EU host for GDPR compliance
+    person_profiles: "identified_only", // Only create profiles for identified users
+    capture_pageview: true, // Capture pageviews automatically
+    opt_out_capturing_by_default: false, // Respect user privacy
   });
 }
 
