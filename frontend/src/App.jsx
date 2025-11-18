@@ -869,29 +869,6 @@ function App() {
             </div>
             <h1 className="font-semibold text-base">Pea</h1>
             <div className="ml-auto flex gap-2 items-center">
-              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
-                <button
-                  onClick={() => setTtsEnabled((v) => !v)}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-                  aria-pressed={ttsEnabled}
-                  aria-label="Toggle auto-read messages"
-                >
-                  {ttsEnabled ? "🔊 Auto-read" : "🔈 Auto-read"}
-                </button>
-                <select
-                  value={selectedVoiceIndex}
-                  onChange={handleVoiceChange}
-                  className="text-sm border rounded px-2 py-1 bg-white"
-                  aria-label="Choose voice"
-                >
-                  {voices.length === 0 && <option>Loading voices...</option>}
-                  {voices.map((v, i) => (
-                    <option key={i} value={i}>
-                      {v.name} {v.lang ? `(${v.lang})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <button
                 onClick={() => setMobileShowProviders(true)}
                 className="md:hidden text-xs bg-green-700 text-white px-3 py-2 rounded-lg font-bold shadow-lg hover:bg-green-800 transition whitespace-nowrap"
@@ -927,16 +904,9 @@ function App() {
                     {splitIntoParagraphs(msg.text).map((para, pIdx) => (
                       <div
                         key={pIdx}
-                        className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word flex items-start justify-between gap-2"
+                        className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word"
                       >
-                        <div className="break-words">{para}</div>
-                        <button
-                          onClick={() => speakText(para, true)}
-                          className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
-                          aria-label="Read message"
-                        >
-                          🔊
-                        </button>
+                        {para}
                       </div>
                     ))}
                   </div>
@@ -1204,34 +1174,9 @@ function App() {
             <p className="text-xs text-gray-600">{activeProvider.specialty}</p>
           </div>
           <div className="ml-auto">
-              <div className="flex items-center gap-3">
-                <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                  {activeProvider.aiNote || "AI Specialist • Available 24/7"}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setTtsEnabled((v) => !v)}
-                    className="text-sm text-gray-600 hover:text-gray-900"
-                    aria-pressed={ttsEnabled}
-                    aria-label="Toggle auto-read messages"
-                  >
-                    {ttsEnabled ? "🔊 Auto-read" : "🔈 Auto-read"}
-                  </button>
-                  <select
-                    value={selectedVoiceIndex}
-                    onChange={handleVoiceChange}
-                    className="text-sm border rounded px-2 py-1 bg-white"
-                    aria-label="Choose voice"
-                  >
-                    {voices.length === 0 && <option>Loading voices...</option>}
-                    {voices.map((v, i) => (
-                      <option key={i} value={i}>
-                        {v.name} {v.lang ? `(${v.lang})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+              {activeProvider.aiNote || "AI Specialist • Available 24/7"}
+            </span>
           </div>
         </div>
 
@@ -1254,16 +1199,9 @@ function App() {
                       key={pIdx}
                       className={`${
                         activeProvider.color || "bg-gray-100"
-                      } rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word flex items-start justify-between gap-2`}
+                      } rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word`}
                     >
-                      <div className="break-words">{para}</div>
-                      <button
-                        onClick={() => speakText(para, true)}
-                        className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
-                        aria-label={`Read message from ${activeProvider.name}`}
-                      >
-                        🔊
-                      </button>
+                      {para}
                     </div>
                   ))}
                 </div>
@@ -1371,29 +1309,6 @@ function App() {
           </div>
           <h1 className="font-semibold text-base">Pea</h1>
           <div className="ml-auto flex gap-2 items-center">
-            <div className="hidden sm:flex items-center gap-2">
-              <button
-                onClick={() => setTtsEnabled((v) => !v)}
-                className="text-sm text-gray-600 hover:text-gray-900"
-                aria-pressed={ttsEnabled}
-                aria-label="Toggle auto-read messages"
-              >
-                {ttsEnabled ? "🔊 Auto-read" : "🔈 Auto-read"}
-              </button>
-              <select
-                value={selectedVoiceIndex}
-                onChange={handleVoiceChange}
-                className="text-sm border rounded px-2 py-1 bg-white"
-                aria-label="Choose voice"
-              >
-                {voices.length === 0 && <option>Loading voices...</option>}
-                {voices.map((v, i) => (
-                  <option key={i} value={i}>
-                    {v.name} {v.lang ? `(${v.lang})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
             {/* Show "View Your Team" button if providers are recommended */}
             {recommendedProviders.length > 0 && (
               <button
@@ -1432,16 +1347,9 @@ function App() {
                   {splitIntoParagraphs(msg.text).map((para, pIdx) => (
                     <div
                       key={pIdx}
-                      className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed animate-fade-in wrap-break-word flex items-start justify-between gap-2"
+                      className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed animate-fade-in wrap-break-word"
                     >
-                      <div className="break-words">{para}</div>
-                      <button
-                        onClick={() => speakText(para, true)}
-                        className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
-                        aria-label="Read message"
-                      >
-                        🔊
-                      </button>
+                      {para}
                     </div>
                   ))}
                 </div>
