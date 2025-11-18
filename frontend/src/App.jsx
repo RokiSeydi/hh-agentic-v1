@@ -94,6 +94,308 @@ function App() {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
+  // Text-to-Speech (TTS) state
+  const [ttsEnabled, setTtsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem("tts_enabled") === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+  const voiceRef = useRef(null);
+  const [voices, setVoices] = useState([]);
+  const [selectedVoiceIndex, setSelectedVoiceIndex] = useState(() => {
+    try {
+      const v = localStorage.getItem("tts_voice_index");
+      return v ? parseInt(v, 10) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  // Speech-to-text (STT) state
+  const recognitionRef = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const recordingIntervalRef = useRef(null);
+
+
+  const initVoices = () => {
+    if (!window.speechSynthesis) return;
+    const v = window.speechSynthesis.getVoices();
+    setVoices(v || []);
+    // choose voice from saved index when available
+    const idx = Math.min(Math.max(0, selectedVoiceIndex || 0), (v || []).length - 1);
+    voiceRef.current = (v && v.length > 0 && v[idx]) ||
+      v.find((vv) => vv.lang?.startsWith("en")) ||
+      v[0] || null;
+  };
+
+  const speakText = (text) => {
+    if (!ttsEnabled) return;
+    if (!text || !window.speechSynthesis) return;
+
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      if (voiceRef.current) utter.voice = voiceRef.current;
+      utter.rate = 1;
+      utter.pitch = 1;
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      console.warn("TTS error:", e);
+    }
+  };
+
+  // Initialize voices (some browsers load voices asynchronously)
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    initVoices();
+    const handler = () => initVoices();
+    window.speechSynthesis.onvoiceschanged = handler;
+    return () => {
+      try {
+        window.speechSynthesis.onvoiceschanged = null;
+      } catch (e) {}
+    };
+  }, []);
+
+  // Persist tts setting
+  useEffect(() => {
+    try {
+      localStorage.setItem("tts_enabled", ttsEnabled ? "true" : "false");
+    } catch (e) {}
+  }, [ttsEnabled]);
+
+  // When voices or selected index change, update the active voice and persist selection
+  useEffect(() => {
+    if (voices && voices.length > 0) {
+      const idx = Math.min(Math.max(0, selectedVoiceIndex || 0), voices.length - 1);
+      voiceRef.current = voices[idx] || voices.find((v) => v.lang?.startsWith("en")) || voices[0];
+      try {
+        localStorage.setItem("tts_voice_index", String(idx));
+      } catch (e) {}
+    }
+  }, [voices, selectedVoiceIndex]);
+
+  const handleVoiceChange = (e) => {
+    const idx = parseInt(e.target.value, 10);
+    setSelectedVoiceIndex(idx);
+  };
+
+  const startListening = () => {
+    // Prefer server-side transcription via MediaRecorder + backend upload
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            noiseSuppression: true,
+            echoCancellation: true,
+          },
+        })
+        .then((stream) => {
+          audioChunksRef.current = [];
+          const options = { mimeType: "audio/webm" };
+          const recorder = new MediaRecorder(stream, options);
+
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+          };
+
+          recorder.onstop = async () => {
+            const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+            // Upload to backend /api/transcribe
+            try {
+              const fd = new FormData();
+              fd.append("file", blob, "speech.webm");
+
+              const resp = await fetch(`${API_URL || ""}/api/transcribe`, {
+                method: "POST",
+                body: fd,
+              });
+
+              if (!resp.ok) {
+                const txt = await resp.text();
+                console.error("Transcription failed:", resp.status, txt);
+                alert("Transcription failed. See console.");
+                setIsListening(false);
+                return;
+              }
+
+              const data = await resp.json();
+              const transcript = data.text || "";
+              if (transcript) {
+                setInput((prev) => (prev ? prev + " " : "") + transcript.trim());
+              }
+            } catch (err) {
+              console.error("Upload/transcribe error:", err);
+              alert("Transcription/upload error. See console.");
+            } finally {
+              setIsListening(false);
+              // stop tracks
+              stream.getTracks().forEach((t) => t.stop());
+            }
+          };
+
+          recorder.start();
+          mediaRecorderRef.current = recorder;
+          setIsListening(true);
+          
+          // Start elapsed time counter
+          setRecordingTime(0);
+          recordingIntervalRef.current = setInterval(() => {
+            setRecordingTime((prev) => prev + 1);
+          }, 1000);
+        })
+        .catch((err) => {
+          console.error("getUserMedia error:", err);
+          alert("Could not access microphone. Check permissions.");
+          setIsListening(false);
+        });
+      return;
+    }
+
+    // Fallback to browser SpeechRecognition if MediaRecorder not available
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      const rec = new SpeechRecognition();
+      rec.lang = voiceRef.current?.lang || navigator.language || "en-US";
+      rec.interimResults = true; // show interim results for better UX
+      rec.maxAlternatives = 1;
+
+      rec.onresult = (ev) => {
+        // Build transcript from results (handles interim + final)
+        let transcript = "";
+        for (let i = 0; i < ev.results.length; i++) {
+          transcript += ev.results[i][0].transcript;
+        }
+
+        // Append interim/final transcript to input visually; final will be persisted when isFinal true
+        const isFinal = ev.results[ev.results.length - 1].isFinal;
+        if (isFinal) {
+          setInput((prev) => (prev ? prev + " " : "") + transcript.trim());
+        } else {
+          setInput((prev) => (prev || "") + (prev && !prev.endsWith(" ") ? " " : "") + transcript.trim());
+        }
+      };
+
+      rec.onend = () => {
+        console.log("SpeechRecognition ended");
+        setIsListening(false);
+      };
+
+      rec.onerror = (err) => {
+        console.error("Speech recognition error:", err);
+        if (err.error === "not-allowed" || err.error === "service-not-allowed") {
+          alert("Microphone permission denied or not available. Please allow microphone access and try again.");
+        }
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+    }
+
+    try {
+      console.log("Starting speech recognition (fallback)...");
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (e) {
+      console.warn("Could not start recognition:", e);
+      alert("Could not start microphone. Make sure your page is served over HTTPS/localhost and microphone permission is granted.");
+    }
+  };
+
+  const stopListening = () => {
+    // Clear timer
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    setRecordingTime(0);
+
+    // If media recorder is active, stop it (this will trigger upload)
+    try {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current = null;
+        return;
+      }
+    } catch (e) {
+      console.warn("Error stopping media recorder:", e);
+    }
+
+    try {
+      recognitionRef.current?.stop();
+    } catch (e) {}
+    setIsListening(false);
+  };
+
+  const cancelRecording = () => {
+    // Clear timer
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    setRecordingTime(0);
+
+    // Stop recorder without uploading
+    try {
+      if (mediaRecorderRef.current) {
+        // Remove event handlers so onstop won't upload
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current = null;
+        // Stop all tracks
+        if (mediaRecorderRef.current?.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+        }
+      }
+    } catch (e) {
+      console.warn("Error canceling recording:", e);
+    }
+
+    try {
+      recognitionRef.current?.stop();
+    } catch (e) {}
+    
+    setIsListening(false);
+    audioChunksRef.current = [];
+  };
+
+  // Track last spoken text to avoid duplicates
+  const lastSpokenRef = useRef("");
+
+  // Auto-speak latest Pea message when TTS enabled
+  useEffect(() => {
+    if (!ttsEnabled) return;
+    const reversed = [...messages].reverse();
+    const lastPea = reversed.find((m) => m.sender === "pea");
+    if (lastPea && lastPea.text && lastSpokenRef.current !== lastPea.text) {
+      speakText(lastPea.text);
+      lastSpokenRef.current = lastPea.text;
+    }
+  }, [messages, ttsEnabled]);
+
+  // Auto-speak latest provider message for the active provider
+  useEffect(() => {
+    if (!ttsEnabled || !activeProvider) return;
+    const conv = providerConversations[activeProvider.id] || [];
+    const lastProviderMsg = [...conv].reverse().find((m) => m.sender === "provider");
+    if (lastProviderMsg && lastProviderMsg.text && lastSpokenRef.current !== lastProviderMsg.text) {
+      speakText(lastProviderMsg.text);
+      lastSpokenRef.current = lastProviderMsg.text;
+    }
+  }, [providerConversations, activeProvider, ttsEnabled]);
+
   // Helper function to split message into paragraphs
   const splitIntoParagraphs = (text) => {
     const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());
@@ -536,6 +838,23 @@ function App() {
   if (viewMode === "split-screen") {
     return (
       <div className="flex flex-col md:flex-row h-screen bg-white">
+        {isListening && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-4 left-1/2 z-50 transform -translate-x-1/2 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-full shadow-lg"
+          >
+            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" aria-hidden="true" />
+            <span className="text-sm font-medium">Recording… {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}</span>
+            <button
+              onClick={cancelRecording}
+              className="ml-2 text-xs text-red-700 hover:text-red-900 underline"
+              aria-label="Cancel recording"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {/* LEFT SIDE - PEA CHAT */}
         <div
           className={`w-full md:w-1/2 border-r border-gray-200 flex flex-col ${
@@ -548,6 +867,29 @@ function App() {
             </div>
             <h1 className="font-semibold text-base">Pea</h1>
             <div className="ml-auto flex gap-2 items-center">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
+                <button
+                  onClick={() => setTtsEnabled((v) => !v)}
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+                  aria-pressed={ttsEnabled}
+                  aria-label="Toggle text to speech"
+                >
+                  {ttsEnabled ? "🔊 TTS" : "🔈 TTS"}
+                </button>
+                <select
+                  value={selectedVoiceIndex}
+                  onChange={handleVoiceChange}
+                  className="text-sm border rounded px-2 py-1 bg-white"
+                  aria-label="Select voice"
+                >
+                  {voices.length === 0 && <option>Loading voices...</option>}
+                  {voices.map((v, i) => (
+                    <option key={i} value={i}>
+                      {v.name} {v.lang ? `(${v.lang})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 onClick={() => setMobileShowProviders(true)}
                 className="md:hidden text-xs bg-green-700 text-white px-3 py-2 rounded-lg font-bold shadow-lg hover:bg-green-800 transition whitespace-nowrap"
@@ -583,9 +925,16 @@ function App() {
                     {splitIntoParagraphs(msg.text).map((para, pIdx) => (
                       <div
                         key={pIdx}
-                        className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word"
+                        className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word flex items-start justify-between gap-2"
                       >
-                        {para}
+                        <div className="break-words">{para}</div>
+                        <button
+                          onClick={() => speakText(para)}
+                          className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
+                          aria-label="Read message"
+                        >
+                          🔊
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -647,6 +996,19 @@ function App() {
                     Math.min(e.target.scrollHeight, 128) + "px";
                 }}
               />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => (isListening ? stopListening() : startListening())}
+                  className={`p-2.5 rounded-full hover:bg-gray-100 transition text-sm ${isListening ? "text-red-600" : "text-gray-600"}`}
+                  aria-pressed={isListening}
+                  aria-label={isListening ? "Stop listening" : "Start voice input"}
+                >
+                  {isListening ? "⏹️" : "🎤"}
+                </button>
+                {isListening && (
+                  <span className="text-xs text-red-600">Listening...</span>
+                )}
+              </div>
               <button
                 onClick={handleSend}
                 disabled={isLoading || !input.trim()}
@@ -804,6 +1166,23 @@ function App() {
 
     return (
       <div className="flex flex-col h-screen bg-white">
+        {isListening && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-4 left-1/2 z-50 transform -translate-x-1/2 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-full shadow-lg"
+          >
+            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" aria-hidden="true" />
+            <span className="text-sm font-medium">Recording… {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}</span>
+            <button
+              onClick={cancelRecording}
+              className="ml-2 text-xs text-red-700 hover:text-red-900 underline"
+              aria-label="Cancel recording"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
           <button
             onClick={() => setViewMode("split-screen")}
@@ -823,9 +1202,34 @@ function App() {
             <p className="text-xs text-gray-600">{activeProvider.specialty}</p>
           </div>
           <div className="ml-auto">
-            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-              {activeProvider.aiNote || "AI Specialist • Available 24/7"}
-            </span>
+              <div className="flex items-center gap-3">
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                  {activeProvider.aiNote || "AI Specialist • Available 24/7"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setTtsEnabled((v) => !v)}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                    aria-pressed={ttsEnabled}
+                    aria-label="Toggle text to speech"
+                  >
+                    {ttsEnabled ? "🔊 TTS" : "🔈 TTS"}
+                  </button>
+                  <select
+                    value={selectedVoiceIndex}
+                    onChange={handleVoiceChange}
+                    className="text-sm border rounded px-2 py-1 bg-white"
+                    aria-label="Select voice"
+                  >
+                    {voices.length === 0 && <option>Loading voices...</option>}
+                    {voices.map((v, i) => (
+                      <option key={i} value={i}>
+                        {v.name} {v.lang ? `(${v.lang})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
           </div>
         </div>
 
@@ -848,9 +1252,16 @@ function App() {
                       key={pIdx}
                       className={`${
                         activeProvider.color || "bg-gray-100"
-                      } rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word`}
+                      } rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed wrap-break-word flex items-start justify-between gap-2`}
                     >
-                      {para}
+                      <div className="break-words">{para}</div>
+                      <button
+                        onClick={() => speakText(para)}
+                        className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
+                        aria-label={`Read message from ${activeProvider.name}`}
+                      >
+                        🔊
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -907,6 +1318,14 @@ function App() {
               }}
             />
             <button
+              onClick={() => (isListening ? stopListening() : startListening())}
+              className={`p-2.5 rounded-full hover:bg-gray-100 transition text-sm ${isListening ? "text-red-600" : "text-gray-600"}`}
+              aria-pressed={isListening}
+              aria-label={isListening ? "Stop listening" : "Start voice input"}
+            >
+              {isListening ? "⏹️" : "🎤"}
+            </button>
+            <button
               onClick={() => handleSendToProvider(input)}
               disabled={isLoading || !input.trim()}
               className="bg-green-600 text-white p-2.5 rounded-full hover:bg-green-700 transition disabled:opacity-50 shrink-0"
@@ -927,12 +1346,52 @@ function App() {
   if (viewMode === "chat-only") {
     return (
       <div className="flex flex-col h-screen bg-white">
+        {isListening && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-4 left-1/2 z-50 transform -translate-x-1/2 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-full shadow-lg"
+          >
+            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" aria-hidden="true" />
+            <span className="text-sm font-medium">Recording… {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}</span>
+            <button
+              onClick={cancelRecording}
+              className="ml-2 text-xs text-red-700 hover:text-red-900 underline"
+              aria-label="Cancel recording"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
           <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
             <Leaf className="w-5 h-5 text-white" />
           </div>
           <h1 className="font-semibold text-base">Pea</h1>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-2 items-center">
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                onClick={() => setTtsEnabled((v) => !v)}
+                className="text-sm text-gray-600 hover:text-gray-900"
+                aria-pressed={ttsEnabled}
+                aria-label="Toggle text to speech"
+              >
+                {ttsEnabled ? "🔊 TTS" : "🔈 TTS"}
+              </button>
+              <select
+                value={selectedVoiceIndex}
+                onChange={handleVoiceChange}
+                className="text-sm border rounded px-2 py-1 bg-white"
+                aria-label="Select voice"
+              >
+                {voices.length === 0 && <option>Loading voices...</option>}
+                {voices.map((v, i) => (
+                  <option key={i} value={i}>
+                    {v.name} {v.lang ? `(${v.lang})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
             {/* Show "View Your Team" button if providers are recommended */}
             {recommendedProviders.length > 0 && (
               <button
@@ -971,9 +1430,16 @@ function App() {
                   {splitIntoParagraphs(msg.text).map((para, pIdx) => (
                     <div
                       key={pIdx}
-                      className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed animate-fade-in wrap-break-word"
+                      className="bg-gray-100 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed animate-fade-in wrap-break-word flex items-start justify-between gap-2"
                     >
-                      {para}
+                      <div className="break-words">{para}</div>
+                      <button
+                        onClick={() => speakText(para)}
+                        className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
+                        aria-label="Read message"
+                      >
+                        🔊
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1036,6 +1502,14 @@ function App() {
               }}
             />
             <button
+              onClick={() => (isListening ? stopListening() : startListening())}
+              className={`p-2.5 rounded-full hover:bg-gray-100 transition text-sm ${isListening ? "text-red-600" : "text-gray-600"}`}
+              aria-pressed={isListening}
+              aria-label={isListening ? "Stop listening" : "Start voice input"}
+            >
+              {isListening ? "⏹️" : "🎤"}
+            </button>
+            <button
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
               className="bg-green-600 text-white p-2.5 rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
@@ -1058,6 +1532,23 @@ function App() {
 
     return (
       <div className="flex flex-col h-screen bg-white">
+        {isListening && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-4 left-1/2 z-50 transform -translate-x-1/2 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-full shadow-lg"
+          >
+            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" aria-hidden="true" />
+            <span className="text-sm font-medium">Recording… {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}</span>
+            <button
+              onClick={cancelRecording}
+              className="ml-2 text-xs text-red-700 hover:text-red-900 underline"
+              aria-label="Cancel recording"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
           <button
             onClick={() => setViewMode("chat-only")}
@@ -1139,6 +1630,23 @@ function App() {
   if (viewMode === "team") {
     return (
       <div className="flex flex-col h-screen bg-white">
+        {isListening && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-4 left-1/2 z-50 transform -translate-x-1/2 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-full shadow-lg"
+          >
+            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" aria-hidden="true" />
+            <span className="text-sm font-medium">Recording… {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}</span>
+            <button
+              onClick={cancelRecording}
+              className="ml-2 text-xs text-red-700 hover:text-red-900 underline"
+              aria-label="Cancel recording"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
           <button
             onClick={() => setViewMode("chat-only")}

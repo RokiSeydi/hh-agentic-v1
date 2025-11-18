@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import multer from "multer";
+import FormData from "form-data";
+import fetch from "node-fetch";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "redis";
 import PEA_SYSTEM_PROMPT from "./peaSystemPrompt.js";
@@ -244,6 +247,52 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Transcription upload handler (OpenAI Whisper)
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post("/api/transcribe", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "OPENAI_API_KEY not configured" });
+    }
+
+    // Build multipart form for OpenAI
+    const form = new FormData();
+    form.append("file", req.file.buffer, {
+      filename: req.file.originalname || "speech.webm",
+      contentType: req.file.mimetype || "audio/webm",
+      knownLength: req.file.size,
+    });
+    // Use "whisper-1" model (OpenAI transcription). Change if needed.
+    form.append("model", "whisper-1");
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        ...form.getHeaders(),
+      },
+      body: form,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("OpenAI transcription error:", response.status, text);
+      return res.status(500).json({ error: "Transcription failed", details: text });
+    }
+
+    const data = await response.json();
+    // OpenAI returns { text: "transcribed text" }
+    return res.json({ text: data.text || "" });
+  } catch (error) {
+    console.error("/api/transcribe error:", error);
+    return res.status(500).json({ error: error.message || "Unknown error" });
+  }
+});
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
