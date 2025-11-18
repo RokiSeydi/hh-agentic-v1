@@ -874,15 +874,15 @@ function App() {
                   onClick={() => setTtsEnabled((v) => !v)}
                   className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
                   aria-pressed={ttsEnabled}
-                  aria-label="Toggle text to speech"
+                  aria-label="Toggle auto-read messages"
                 >
-                  {ttsEnabled ? "🔊 TTS" : "🔈 TTS"}
+                  {ttsEnabled ? "🔊 Auto-read" : "🔈 Auto-read"}
                 </button>
                 <select
                   value={selectedVoiceIndex}
                   onChange={handleVoiceChange}
                   className="text-sm border rounded px-2 py-1 bg-white"
-                  aria-label="Select voice"
+                  aria-label="Choose voice"
                 >
                   {voices.length === 0 && <option>Loading voices...</option>}
                   {voices.map((v, i) => (
@@ -1213,15 +1213,15 @@ function App() {
                     onClick={() => setTtsEnabled((v) => !v)}
                     className="text-sm text-gray-600 hover:text-gray-900"
                     aria-pressed={ttsEnabled}
-                    aria-label="Toggle text to speech"
+                    aria-label="Toggle auto-read messages"
                   >
-                    {ttsEnabled ? "🔊 TTS" : "🔈 TTS"}
+                    {ttsEnabled ? "🔊 Auto-read" : "🔈 Auto-read"}
                   </button>
                   <select
                     value={selectedVoiceIndex}
                     onChange={handleVoiceChange}
                     className="text-sm border rounded px-2 py-1 bg-white"
-                    aria-label="Select voice"
+                    aria-label="Choose voice"
                   >
                     {voices.length === 0 && <option>Loading voices...</option>}
                     {voices.map((v, i) => (
@@ -1376,15 +1376,15 @@ function App() {
                 onClick={() => setTtsEnabled((v) => !v)}
                 className="text-sm text-gray-600 hover:text-gray-900"
                 aria-pressed={ttsEnabled}
-                aria-label="Toggle text to speech"
+                aria-label="Toggle auto-read messages"
               >
-                {ttsEnabled ? "🔊 TTS" : "🔈 TTS"}
+                {ttsEnabled ? "🔊 Auto-read" : "🔈 Auto-read"}
               </button>
               <select
                 value={selectedVoiceIndex}
                 onChange={handleVoiceChange}
                 className="text-sm border rounded px-2 py-1 bg-white"
-                aria-label="Select voice"
+                aria-label="Choose voice"
               >
                 {voices.length === 0 && <option>Loading voices...</option>}
                 {voices.map((v, i) => (
