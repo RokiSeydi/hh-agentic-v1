@@ -133,8 +133,10 @@ function App() {
       v[0] || null;
   };
 
-  const speakText = (text) => {
-    if (!ttsEnabled) return;
+  const speakText = (text, forceSpeak = false) => {
+    // If manually triggered (forceSpeak=true), always speak
+    // If auto-speaking, respect ttsEnabled setting
+    if (!forceSpeak && !ttsEnabled) return;
     if (!text || !window.speechSynthesis) return;
 
     try {
@@ -929,7 +931,7 @@ function App() {
                       >
                         <div className="break-words">{para}</div>
                         <button
-                          onClick={() => speakText(para)}
+                          onClick={() => speakText(para, true)}
                           className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
                           aria-label="Read message"
                         >
@@ -1256,7 +1258,7 @@ function App() {
                     >
                       <div className="break-words">{para}</div>
                       <button
-                        onClick={() => speakText(para)}
+                        onClick={() => speakText(para, true)}
                         className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
                         aria-label={`Read message from ${activeProvider.name}`}
                       >
@@ -1434,7 +1436,7 @@ function App() {
                     >
                       <div className="break-words">{para}</div>
                       <button
-                        onClick={() => speakText(para)}
+                        onClick={() => speakText(para, true)}
                         className="ml-2 text-gray-500 hover:text-gray-700 text-sm"
                         aria-label="Read message"
                       >
