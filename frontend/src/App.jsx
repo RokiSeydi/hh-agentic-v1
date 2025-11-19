@@ -91,6 +91,21 @@ function App() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(true);
 
+  // Contact info collection for connecting with real providers
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactInfo, setContactInfo] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
+  const [contactSubmitted, setContactSubmitted] = useState(() => {
+    try {
+      return localStorage.getItem(`contact_submitted_${conversationId}`) === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
@@ -593,6 +608,19 @@ function App() {
           text: `Great! I've added ${provider.name} to your care team. You can chat with them anytime 💙`,
         },
       ]);
+
+      // Track provider added
+      posthog.capture("provider_added_to_team", {
+        provider_id: provider.id,
+        provider_name: provider.name,
+        provider_specialty: provider.specialty,
+        team_size: activeTeam.length + 1,
+      });
+
+      // Show contact modal after adding first provider (if not already submitted)
+      if (activeTeam.length === 0 && !contactSubmitted) {
+        setShowContactModal(true);
+      }
     }
 
     // Move to next provider or go back to chat
@@ -704,6 +732,63 @@ function App() {
       console.error("Provider chat error:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSubmitContact = async () => {
+    if (!contactInfo.name.trim() || !contactInfo.email.trim()) {
+      alert("Please enter your name and email");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactInfo.email)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/submit-contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          name: contactInfo.name,
+          email: contactInfo.email,
+          phone: contactInfo.phone,
+          interestedProviders: activeTeam.map(p => ({
+            id: p.id,
+            name: p.name,
+            specialty: p.specialty,
+          })),
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to submit contact info");
+
+      // Mark as submitted
+      setContactSubmitted(true);
+      localStorage.setItem(`contact_submitted_${conversationId}`, "true");
+      setShowContactModal(false);
+
+      // Track submission
+      posthog.capture("contact_info_submitted", {
+        team_size: activeTeam.length,
+        has_phone: !!contactInfo.phone,
+      });
+
+      // Show success message
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "pea",
+          text: "Perfect! We've got your details. The team will reach out soon to help you book appointments 💙",
+        },
+      ]);
+    } catch (error) {
+      console.error("Contact submission error:", error);
+      alert("Failed to submit. Please try again.");
     }
   };
 
@@ -895,6 +980,84 @@ function App() {
   if (viewMode === "split-screen") {
     return (
       <div className="flex flex-col md:flex-row h-screen bg-white">
+        {/* Contact Info Modal */}
+        {showContactModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Ready to Connect?</h2>
+                <button
+                  onClick={() => setShowContactModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                Great! You've built your care team. Share your details so we can help you book real appointments with these specialists.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Your Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={contactInfo.name}
+                    onChange={(e) => setContactInfo(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Sarah Johnson"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    value={contactInfo.email}
+                    onChange={(e) => setContactInfo(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="e.g., sarah@example.com"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={contactInfo.phone}
+                    onChange={(e) => setContactInfo(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="e.g., 07123 456789"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setShowContactModal(false)}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition"
+                >
+                  Maybe Later
+                </button>
+                <button
+                  onClick={handleSubmitContact}
+                  className="flex-1 bg-green-600 text-white py-2.5 rounded-lg font-medium hover:bg-green-700 transition"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Accessibility Menu Modal */}
         {showAccessibilityMenu && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -1875,6 +2038,30 @@ function App() {
             ))
           )}
         </div>
+
+        {/* Connect with Team button (if not already submitted) */}
+        {activeTeam.length > 0 && !contactSubmitted && (
+          <div className="border-t border-gray-200 p-4 bg-white">
+            <button
+              onClick={() => setShowContactModal(true)}
+              className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+            >
+              Ready to Book Real Appointments? 📅
+            </button>
+            <p className="text-xs text-gray-500 text-center mt-2">
+              Share your details and we'll help you connect
+            </p>
+          </div>
+        )}
+
+        {contactSubmitted && (
+          <div className="border-t border-gray-200 p-4 bg-green-50">
+            <div className="flex items-center justify-center gap-2 text-green-700">
+              <Check className="w-5 h-5" />
+              <span className="text-sm font-medium">Contact info submitted! We'll be in touch soon.</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
