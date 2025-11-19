@@ -755,6 +755,83 @@ app.get("/api/providers", (req, res) => {
   res.json(Object.values(PROVIDER_REGISTRY));
 });
 
+// Submit contact info for connecting with real providers
+app.post("/api/submit-contact", async (req, res) => {
+  try {
+    const { conversationId, name, email, phone, interestedProviders } = req.body;
+
+    if (!conversationId || !name || !email) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Save contact info to Redis with conversation context
+    const contactData = {
+      conversationId,
+      name,
+      email,
+      phone: phone || null,
+      interestedProviders: interestedProviders || [],
+      submittedAt: new Date().toISOString(),
+    };
+
+    // Store in Redis with a contact-specific key
+    await initRedis();
+    if (redis) {
+      await redis.setEx(
+        `contact:${conversationId}`,
+        60 * 60 * 24 * 30, // 30 days TTL
+        JSON.stringify(contactData)
+      );
+
+      // Also add to a list of all contacts for admin retrieval
+      await redis.lPush("contact:all", JSON.stringify(contactData));
+    }
+
+    console.log(`✅ Contact submitted: ${name} (${email}) - ${interestedProviders.length} providers`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Contact submission error:", error);
+    res.status(500).json({ error: "Failed to save contact info" });
+  }
+});
+
+// Get all contact submissions (for admin/disability society team)
+app.get("/api/contacts", async (req, res) => {
+  try {
+    await initRedis();
+    if (!redis) {
+      return res.json({ contacts: [] });
+    }
+
+    // Get all contacts from the list
+    const contactsJson = await redis.lRange("contact:all", 0, -1);
+    const contacts = contactsJson.map(json => JSON.parse(json));
+
+    // Sort by most recent first
+    contacts.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+    res.json({ contacts });
+  } catch (error) {
+    console.error("Error fetching contacts:", error);
+    res.status(500).json({ error: "Failed to fetch contacts" });
+  }
+});
+
+// Admin login validation
+app.post("/api/admin/login", (req, res) => {
+  const { email, password } = req.body;
+
+  const adminEmail = process.env.ADMIN_EMAIL || "info@weatholdinghealth.com";
+  const adminPassword = process.env.ADMIN_PASSWORD || "building123";
+
+  if (email === adminEmail && password === adminPassword) {
+    return res.json({ success: true });
+  }
+
+  return res.status(401).json({ success: false, error: "Invalid credentials" });
+});
+
 // Clear conversation endpoint
 app.post("/api/clear-conversation", (req, res) => {
   const { conversationId } = req.body;
