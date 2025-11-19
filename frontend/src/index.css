@@ -77,3 +77,35 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
+
+/* Accessibility: High Contrast Mode */
+body.high-contrast {
+  /* Stronger background contrast */
+  --tw-bg-opacity: 1;
+}
+
+body.high-contrast .bg-gray-100 {
+  background-color: rgb(229 231 235) !important; /* gray-200 instead of gray-100 */
+}
+
+body.high-contrast .bg-green-600 {
+  background-color: rgb(21 128 61) !important; /* green-700 for stronger contrast */
+}
+
+body.high-contrast .text-gray-600 {
+  color: rgb(75 85 99) !important; /* gray-600 darker */
+}
+
+body.high-contrast .border-gray-200 {
+  border-color: rgb(156 163 175) !important; /* gray-400 */
+}
+
+/* Accessibility: Reduced Motion */
+body.reduce-motion *,
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

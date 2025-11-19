@@ -94,6 +94,25 @@ function App() {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
+  // Accessibility settings
+  const [showAccessibilityMenu, setShowAccessibilityMenu] = useState(false);
+  const [accessibilitySettings, setAccessibilitySettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("accessibility_settings");
+      return saved ? JSON.parse(saved) : {
+        fontSize: "normal", // small, normal, large, xl
+        highContrast: false,
+        reducedMotion: false,
+      };
+    } catch (e) {
+      return {
+        fontSize: "normal",
+        highContrast: false,
+        reducedMotion: false,
+      };
+    }
+  });
+
   // Text-to-Speech (TTS) state
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try {
@@ -112,6 +131,42 @@ function App() {
       return 0;
     }
   });
+
+  // Persist accessibility settings
+  useEffect(() => {
+    try {
+      localStorage.setItem("accessibility_settings", JSON.stringify(accessibilitySettings));
+    } catch (e) {}
+  }, [accessibilitySettings]);
+
+  // Apply accessibility settings to document
+  useEffect(() => {
+    // Font size
+    const root = document.documentElement;
+    if (accessibilitySettings.fontSize === "small") {
+      root.style.fontSize = "14px";
+    } else if (accessibilitySettings.fontSize === "large") {
+      root.style.fontSize = "18px";
+    } else if (accessibilitySettings.fontSize === "xl") {
+      root.style.fontSize = "20px";
+    } else {
+      root.style.fontSize = "16px";
+    }
+
+    // High contrast
+    if (accessibilitySettings.highContrast) {
+      document.body.classList.add("high-contrast");
+    } else {
+      document.body.classList.remove("high-contrast");
+    }
+
+    // Reduced motion
+    if (accessibilitySettings.reducedMotion) {
+      document.body.classList.add("reduce-motion");
+    } else {
+      document.body.classList.remove("reduce-motion");
+    }
+  }, [accessibilitySettings]);
 
   // Speech-to-text (STT) state
   const recognitionRef = useRef(null);
@@ -840,6 +895,101 @@ function App() {
   if (viewMode === "split-screen") {
     return (
       <div className="flex flex-col md:flex-row h-screen bg-white">
+        {/* Accessibility Menu Modal */}
+        {showAccessibilityMenu && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Accessibility Settings</h2>
+                <button
+                  onClick={() => setShowAccessibilityMenu(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close accessibility settings"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Font Size */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Text Size
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {["small", "normal", "large", "xl"].map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => setAccessibilitySettings(prev => ({ ...prev, fontSize: size }))}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                          accessibilitySettings.fontSize === size
+                            ? "bg-green-600 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {size === "small" ? "S" : size === "normal" ? "M" : size === "large" ? "L" : "XL"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* High Contrast */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      High Contrast
+                    </label>
+                    <p className="text-xs text-gray-500">Stronger colors for better visibility</p>
+                  </div>
+                  <button
+                    onClick={() => setAccessibilitySettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                      accessibilitySettings.highContrast ? "bg-green-600" : "bg-gray-300"
+                    }`}
+                    aria-pressed={accessibilitySettings.highContrast}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                        accessibilitySettings.highContrast ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Reduced Motion */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Reduce Motion
+                    </label>
+                    <p className="text-xs text-gray-500">Minimize animations and transitions</p>
+                  </div>
+                  <button
+                    onClick={() => setAccessibilitySettings(prev => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                      accessibilitySettings.reducedMotion ? "bg-green-600" : "bg-gray-300"
+                    }`}
+                    aria-pressed={accessibilitySettings.reducedMotion}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                        accessibilitySettings.reducedMotion ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowAccessibilityMenu(false)}
+                className="w-full mt-6 bg-green-600 text-white py-2.5 rounded-lg font-medium hover:bg-green-700 transition"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
         {isListening && (
           <div
             role="status"
@@ -869,6 +1019,16 @@ function App() {
             </div>
             <h1 className="font-semibold text-base">Pea</h1>
             <div className="ml-auto flex gap-2 items-center">
+              <button
+                onClick={() => setShowAccessibilityMenu(true)}
+                className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                aria-label="Accessibility settings"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                <span className="hidden sm:inline">Accessibility</span>
+              </button>
               <button
                 onClick={() => setMobileShowProviders(true)}
                 className="md:hidden text-xs bg-green-700 text-white px-3 py-2 rounded-lg font-bold shadow-lg hover:bg-green-800 transition whitespace-nowrap"
@@ -1286,6 +1446,101 @@ function App() {
   if (viewMode === "chat-only") {
     return (
       <div className="flex flex-col h-screen bg-white">
+        {/* Accessibility Menu Modal */}
+        {showAccessibilityMenu && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Accessibility Settings</h2>
+                <button
+                  onClick={() => setShowAccessibilityMenu(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close accessibility settings"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Font Size */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Text Size
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {["small", "normal", "large", "xl"].map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => setAccessibilitySettings(prev => ({ ...prev, fontSize: size }))}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                          accessibilitySettings.fontSize === size
+                            ? "bg-green-600 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {size === "small" ? "S" : size === "normal" ? "M" : size === "large" ? "L" : "XL"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* High Contrast */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      High Contrast
+                    </label>
+                    <p className="text-xs text-gray-500">Stronger colors for better visibility</p>
+                  </div>
+                  <button
+                    onClick={() => setAccessibilitySettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                      accessibilitySettings.highContrast ? "bg-green-600" : "bg-gray-300"
+                    }`}
+                    aria-pressed={accessibilitySettings.highContrast}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                        accessibilitySettings.highContrast ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Reduced Motion */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Reduce Motion
+                    </label>
+                    <p className="text-xs text-gray-500">Minimize animations and transitions</p>
+                  </div>
+                  <button
+                    onClick={() => setAccessibilitySettings(prev => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                      accessibilitySettings.reducedMotion ? "bg-green-600" : "bg-gray-300"
+                    }`}
+                    aria-pressed={accessibilitySettings.reducedMotion}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                        accessibilitySettings.reducedMotion ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowAccessibilityMenu(false)}
+                className="w-full mt-6 bg-green-600 text-white py-2.5 rounded-lg font-medium hover:bg-green-700 transition"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
         {isListening && (
           <div
             role="status"
@@ -1309,6 +1564,16 @@ function App() {
           </div>
           <h1 className="font-semibold text-base">Pea</h1>
           <div className="ml-auto flex gap-2 items-center">
+            <button
+              onClick={() => setShowAccessibilityMenu(true)}
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              aria-label="Accessibility settings"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              <span className="hidden sm:inline">Accessibility</span>
+            </button>
             {/* Show "View Your Team" button if providers are recommended */}
             {recommendedProviders.length > 0 && (
               <button
